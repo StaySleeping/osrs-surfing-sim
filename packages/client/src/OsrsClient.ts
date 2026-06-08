@@ -42,12 +42,13 @@ export class OsrsClient {
   private unbindPointer: (() => void) | null = null;
   private visualFrameId: number | null = null;
   private lastVisualFrameMs = 0;
-  /** Elapsed ms within the current tick period (0 … tickMs). Drives smooth movement. */
+  /** Ms elapsed within the current tick period (0 … tickMs). */
   private tickAccumulatorMs = 0;
-  private tickBlend = 0;
   private readonly motion = new SurfboardMotionInterpolator();
   private tidePhaseFrom: number | null = null;
   private paused = false;
+  private lastDisplayPosition = { x: 0, y: 0 };
+  private lastTickBlend = 0;
 
   private constructor(
     simulation: GameSimulation,
@@ -173,6 +174,9 @@ export class OsrsClient {
       pause: () => client.setPaused(true),
       resume: () => client.setPaused(false),
       renderFrame: () => client.renderFrame(),
+      getDisplayPosition: () => client.getDisplayPosition(),
+      getTickBlend: () => client.getTickBlend(),
+      onSimulationTick: (before, after) => client.motion.onSimulationTick(before, after),
       afterTick: () => {
         const snapshot = simulation.getSnapshot();
         renderer.syncMapAfterTick(snapshot, simulation.getArena().map);
@@ -223,10 +227,8 @@ export class OsrsClient {
   }
 
   private startTickLoop(): void {
-    const now = performance.now();
-    this.lastVisualFrameMs = now;
+    this.lastVisualFrameMs = performance.now();
     this.tickAccumulatorMs = 0;
-    this.tickBlend = 0;
     this.visualFrameId = requestAnimationFrame((frameNow) => this.onVisualFrame(frameNow));
   }
 
@@ -237,7 +239,7 @@ export class OsrsClient {
     this.simulation.tick();
 
     const snapshot = this.simulation.getSnapshot();
-    this.motion.onSimulationTick(beforeTick, snapshot, this.simulation.tickMs);
+    this.motion.onSimulationTick(beforeTick, snapshot);
     const map = this.simulation.getArena().map;
     this.renderer.syncMapAfterTick(snapshot, map);
     this.sidePanel.update(snapshot);
@@ -250,67 +252,69 @@ export class OsrsClient {
     }
 
     for (const drop of this.simulation.consumeXpDrops()) {
+      const tokenPart = drop.tokens > 0 ? ` +${drop.tokens} Tokens` : '';
       this.renderer.showXpDrop(
-        `+${drop.agility} Agil +${drop.sailing} Sail +${drop.tokens} Tokens`,
+        `+${drop.agility} Agil +${drop.sailing} Sail${tokenPart}`,
         drop.x,
         drop.y,
       );
+      const chatTokenPart = drop.tokens > 0 ? `, +${drop.tokens} Coral Tokens` : '';
       this.chatbox.push(
-        `+${drop.agility} Agility XP, +${drop.sailing} Sailing XP, +${drop.tokens} Coral Tokens`,
+        `+${drop.agility} Agility XP, +${drop.sailing} Sailing XP${chatTokenPart}`,
         'xp',
       );
     }
   }
 
-  private advanceMotionAndSimulation(deltaMs: number): void {
-    const tickMs = this.simulation.tickMs;
-    let msLeft = deltaMs;
-
-    const msUntilTick = tickMs - this.tickAccumulatorMs;
-    const beforeTickMs = Math.min(msLeft, msUntilTick);
-    if (beforeTickMs > 0) {
-      this.motion.advance(beforeTickMs);
-      this.tickAccumulatorMs += beforeTickMs;
-      msLeft -= beforeTickMs;
-    }
-
-    if (this.tickAccumulatorMs >= tickMs) {
-      this.tickAccumulatorMs = 0;
-      this.onGameTick();
-
-      if (msLeft > 0) {
-        this.motion.advance(msLeft);
-        this.tickAccumulatorMs += msLeft;
-      }
-    }
-  }
-
   private onVisualFrame(now: number): void {
-    const deltaMs = this.lastVisualFrameMs > 0 ? now - this.lastVisualFrameMs : 0;
+    if (!this.paused) {
+      const tickMs = this.simulation.tickMs;
+      const deltaMs =
+        this.lastVisualFrameMs > 0
+          ? Math.min(tickMs, Math.max(0, now - this.lastVisualFrameMs))
+          : 0;
 
-    if (!this.paused && deltaMs > 0) {
-      this.advanceMotionAndSimulation(deltaMs);
-      this.tickBlend = this.tickAccumulatorMs / this.simulation.tickMs;
-      this.renderVisuals(now);
+      if (deltaMs > 0) {
+        this.tickAccumulatorMs += deltaMs;
+
+        if (this.tickAccumulatorMs >= tickMs) {
+          this.tickAccumulatorMs -= tickMs;
+          this.onGameTick();
+        }
+
+        const tickBlend = this.tickAccumulatorMs / tickMs;
+        this.renderVisuals(now, tickBlend);
+      }
     }
 
     this.lastVisualFrameMs = now;
     this.visualFrameId = requestAnimationFrame((frameNow) => this.onVisualFrame(frameNow));
   }
 
-  private renderVisuals(visualTimeMs = performance.now()): void {
+  private renderVisuals(visualTimeMs = performance.now(), tickBlend = 0): void {
     const snapshot = this.simulation.getSnapshot();
     const map = this.simulation.getArena().map;
+    this.motion.ensureSynced(snapshot);
     const displaySnapshot = this.motion.buildDisplaySnapshot(
       snapshot,
       this.tidePhaseFrom,
-      this.tickBlend,
+      tickBlend,
     );
+    this.lastDisplayPosition = { ...displaySnapshot.surfboard.position };
+    this.lastTickBlend = tickBlend;
     this.renderer.render(displaySnapshot, map, visualTimeMs);
   }
 
   private renderFrame(): void {
-    this.renderVisuals();
+    this.renderVisuals(performance.now(), this.lastTickBlend);
+  }
+
+  getDisplayPosition(): { x: number; y: number } {
+    return { ...this.lastDisplayPosition };
+  }
+
+  getTickBlend(): number {
+    return this.lastTickBlend;
   }
 
   destroy(): void {

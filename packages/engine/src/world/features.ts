@@ -56,7 +56,7 @@ export interface TideState {
 }
 
 const TAU = Math.PI * 2;
-const DEFAULT_TIDE_ADVANCE = 0.025;
+const DEFAULT_TIDE_ADVANCE = 0.05;
 
 export function createTideState(config: TideConfig): TideState {
   return {
@@ -171,24 +171,31 @@ export function markZoneTricked(zones: TrickZone[], zoneId: string): TrickZone[]
   return zones.map((zone) => (zone.id === zoneId ? { ...zone, tricked: true } : zone));
 }
 
-/** Re-enable tricks on coral features when the tide reveals them again. */
+export type TrickZoneRelocator = (zone: TrickZone, allZones: TrickZone[]) => TrickZone;
+
+/** Re-enable tricks and optionally relocate features when the tide reveals them again. */
 export function refreshTrickZonesForTide(
   zones: TrickZone[],
   tide: TideState | null,
   wasSubmerged: Map<string, boolean>,
+  relocate?: TrickZoneRelocator,
 ): TrickZone[] {
   if (!tide) {
     return zones;
   }
 
-  return zones.map((zone) => {
+  const next = zones.map((zone) => ({ ...zone, center: { ...zone.center } }));
+
+  for (let i = 0; i < next.length; i += 1) {
+    const zone = next[i];
     const submerged = isTrickZoneSubmerged(zone, tide);
     const prev = wasSubmerged.get(zone.id) ?? false;
     wasSubmerged.set(zone.id, submerged);
 
-    if (prev && !submerged && zone.tricked) {
-      return { ...zone, tricked: false };
+    if (prev && !submerged) {
+      next[i] = relocate ? relocate(zone, next) : { ...zone, tricked: false };
     }
-    return zone;
-  });
+  }
+
+  return next;
 }

@@ -1,0 +1,69 @@
+- generic [ref=e2]:
+  - generic [ref=e7]:
+    - generic [ref=e12]:
+      - text: Welcome to Ura Ura Swell.
+      - text: Click the ground to walk. Click Kaulu to talk.
+      - text: Click your surfboard on the sand ring to paddle out.
+      - text: Prime Rail / Tunnel / Jump 1–4 ticks before you hit that coral feature.
+    - complementary [ref=e14]:
+      - generic [ref=e19]:
+        - button "Combat" [disabled] [ref=e20]:
+          - img "Combat" [ref=e21]
+        - button "Stats" [disabled] [ref=e22]:
+          - img "Stats" [ref=e23]
+        - button "Sailing" [disabled] [ref=e24]:
+          - img "Sailing" [ref=e25]
+        - button "Inventory" [disabled] [ref=e26]:
+          - img "Inventory" [ref=e27]
+        - button "Prayer" [disabled] [ref=e28]:
+          - img "Prayer" [ref=e29]
+        - button "Magic" [disabled] [ref=e30]:
+          - img "Magic" [ref=e31]
+      - generic [ref=e34]:
+        - generic [ref=e36]: Ura Ura Board
+        - generic [ref=e38]: Combo
+        - generic [ref=e39]:
+          - button "Stats" [ref=e40] [cursor=pointer]:
+            - img "Stats" [ref=e41]
+          - button "Movement" [ref=e42] [cursor=pointer]:
+            - img "Movement" [ref=e43]
+          - button "Rewards" [ref=e44] [cursor=pointer]:
+            - img "Rewards" [ref=e45]
+        - generic [ref=e46]:
+          - paragraph [ref=e47]: Navigation
+          - generic [ref=e48]:
+            - button "Lie down" [ref=e49] [cursor=pointer]:
+              - img "Lie down" [ref=e50]
+            - button "Faster" [ref=e51] [cursor=pointer]:
+              - img "Faster" [ref=e52]
+            - button [disabled] [ref=e53] [cursor=pointer]
+            - button [disabled] [ref=e54] [cursor=pointer]
+            - button "Paddle" [ref=e55] [cursor=pointer]:
+              - img "Paddle" [ref=e56]
+            - button "Slower" [ref=e57] [cursor=pointer]:
+              - img "Slower" [ref=e58]
+            - button "Stop" [ref=e59] [cursor=pointer]:
+              - img "Stop" [ref=e60]
+          - generic [ref=e61]:
+            - button "Paddle Paddle" [ref=e62] [cursor=pointer]:
+              - img "Paddle" [ref=e63]
+              - generic [ref=e64]: Paddle
+            - button "Ride Ride" [ref=e65] [cursor=pointer]:
+              - img "Ride" [ref=e66]
+              - generic [ref=e67]: Ride
+          - paragraph [ref=e68]: Trick rhythm
+          - generic [ref=e69]:
+            - button "Rail ·" [ref=e70] [cursor=pointer]:
+              - generic [ref=e71]: Rail
+              - generic [ref=e72]: ·
+            - button "Tunnel ·" [ref=e73] [cursor=pointer]:
+              - generic [ref=e74]: Tunnel
+              - generic [ref=e75]: ·
+            - button "Jump ·" [ref=e76] [cursor=pointer]:
+              - generic [ref=e77]: Jump
+              - generic [ref=e78]: ·
+          - paragraph [ref=e79]: Prime 1–4 ticks before you hit the matching coral. Too early or late = bail.
+  - generic:
+    - generic:
+      - strong: Debug
+      - text: "[1/2/3] tune turn/paddle/ride"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getTile } from '../world/collision.js';
+import { isTrickZoneSubmerged } from '../world/features.js';
 import { createCoralParkSlice } from '../world/maps.js';
 import { GameSimulation } from './simulation.js';
 
@@ -13,6 +14,7 @@ describe('Coral Park gameplay flow', () => {
     }
 
     const sim = new GameSimulation({ arena });
+    sim.setTideFrozen(true);
 
     sim.clickWorld(arena.npcs[0].x, arena.npcs[0].y);
     for (let i = 0; i < 8; i += 1) {
@@ -29,14 +31,19 @@ describe('Coral Park gameplay flow', () => {
     }
     expect(sim.getSnapshot().boardMounted).toBe(true);
 
+    const tide = sim.getSnapshot().tide;
+    expect(tide).not.toBeNull();
     const riderPos = sim.getSnapshot().surfboard.position;
     const rail = arena.trickZones
-      .filter((zone) => zone.type === 'rail')
+      .filter(
+        (zone) => zone.type === 'rail' && (tide === null || !isTrickZoneSubmerged(zone, tide)),
+      )
       .sort((a, b) => {
         const da = Math.hypot(a.center.x - riderPos.x, a.center.y - riderPos.y);
         const db = Math.hypot(b.center.x - riderPos.x, b.center.y - riderPos.y);
         return da - db;
       })[0]!;
+    expect(rail).toBeDefined();
     sim.setSpeedState('paddling');
     const approachX = rail.center.x + Math.cos(rail.rotationRadians) * 4;
     const approachY = rail.center.y + Math.sin(rail.rotationRadians) * 4;

@@ -8,6 +8,7 @@ export * from './world/coords.js';
 export * from './world/collision.js';
 export * from './world/features.js';
 export * from './world/maps.js';
+export * from './world/trickZonePlacement.js';
 export * from './world/npc.js';
 export * from './progression/types.js';
 export * from './progression/progression.js';

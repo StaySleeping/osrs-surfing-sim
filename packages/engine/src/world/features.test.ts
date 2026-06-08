@@ -6,6 +6,7 @@ import {
   isApproachHeadingValid,
   isPointInTideSweep,
   isTrickZoneSubmerged,
+  refreshTrickZonesForTide,
   type TrickZone,
 } from './features.js';
 
@@ -54,5 +55,30 @@ describe('ring tide', () => {
     expect(isTrickZoneSubmerged(zone, tide)).toBe(true);
     expect(findTrickZoneAt([zone], { x: 30, y: 11 }, tide)).toBeNull();
     expect(findTrickZoneAt([zone], { x: 30, y: 11 }, null)).toBe(zone);
+  });
+
+  it('relocates features when they resurface after the swell', () => {
+    const zone: TrickZone = {
+      id: 'west',
+      type: 'rail',
+      prepareSlot: 0,
+      center: { x: 18, y: 11 },
+      radius: 1,
+      rotationRadians: Math.PI / 2,
+      tricked: true,
+    };
+    expect(isTrickZoneSubmerged(zone, tide)).toBe(false);
+
+    const wasSubmerged = new Map<string, boolean>([[zone.id, true]]);
+
+    const [relocated] = refreshTrickZonesForTide([zone], tide, wasSubmerged, (entry) => ({
+      ...entry,
+      center: { x: 22, y: 14 },
+      tricked: false,
+    }));
+
+    expect(relocated.center).toEqual({ x: 22, y: 14 });
+    expect(relocated.tricked).toBe(false);
+    expect(wasSubmerged.get(zone.id)).toBe(false);
   });
 });

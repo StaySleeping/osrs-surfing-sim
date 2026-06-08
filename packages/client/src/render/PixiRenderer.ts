@@ -66,7 +66,8 @@ export class PixiRenderer implements IRenderer {
       height: VIEWPORT_HEIGHT,
       backgroundColor: TILE_PALETTE.deepWater,
       antialias: false,
-      resolution: 1,
+      resolution: 2,
+      autoDensity: true,
     });
     container.appendChild(this.app.canvas);
 
@@ -510,25 +511,24 @@ export function bindPointerEvents(
   onClick: (worldX: number, worldY: number) => void,
   screenToWorld: (x: number, y: number) => { x: number; y: number },
 ): () => void {
-  const toCanvasCoords = (event: PointerEvent): { x: number; y: number } => {
+  /** Map pointer to logical viewport coords (0…VIEWPORT), independent of Pixi resolution / CSS scale. */
+  const toViewportCoords = (event: PointerEvent): { x: number; y: number } => {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: ((event.clientX - rect.left) / rect.width) * VIEWPORT_WIDTH,
+      y: ((event.clientY - rect.top) / rect.height) * VIEWPORT_HEIGHT,
     };
   };
 
   const handleMove = (event: PointerEvent) => {
-    const { x, y } = toCanvasCoords(event);
+    const { x, y } = toViewportCoords(event);
     const world = screenToWorld(x, y);
     onMove(world.x, world.y);
   };
 
   const handleClick = (event: PointerEvent) => {
     event.preventDefault();
-    const { x, y } = toCanvasCoords(event);
+    const { x, y } = toViewportCoords(event);
     const world = screenToWorld(x, y);
     onClick(world.x, world.y);
   };

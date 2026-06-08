@@ -1,5 +1,5 @@
 import type { TrickPrepareSlot } from '../constants/tricks.js';
-import { createWorldMap, getTile, setTile, type WorldMap } from './collision.js';
+import { createWorldMap, setTile, type WorldMap } from './collision.js';
 import {
   CORAL_PARK_ISLAND_CX,
   CORAL_PARK_ISLAND_CY,
@@ -17,6 +17,12 @@ import {
 } from './coralParkCoast.js';
 import type { TideConfig, TrickFeatureType, TrickZone } from './features.js';
 import type { NpcDefinition } from './npc.js';
+import {
+  clockwiseTangent,
+  CORAL_PARK_TRICK_ZONE_RADIUS,
+  isFarEnoughFromZones,
+  reefCenterAtAngle,
+} from './trickZonePlacement.js';
 
 export {
   CORAL_PARK_ISLAND_CX,
@@ -38,8 +44,6 @@ export interface GameArena {
   npcs: NpcDefinition[];
 }
 
-const CORAL_PARK_TRICK_ZONE_RADIUS = 4;
-
 const TRICK_TYPES: TrickFeatureType[] = ['rail', 'tunnel', 'jump', 'brain_coral', 'wall_ride'];
 const TYPE_TO_SLOT: Record<TrickFeatureType, TrickPrepareSlot> = {
   rail: 0,
@@ -51,43 +55,6 @@ const TYPE_TO_SLOT: Record<TrickFeatureType, TrickPrepareSlot> = {
 
 const TRICK_RING_POSITIONS = [0.32, 0.62, 0.88];
 const TRICK_ZONE_COUNT = 15;
-const MIN_TRICK_CENTER_GAP = 12;
-
-/** Clockwise reef ride tangent at a given polar angle. */
-function clockwiseTangent(angle: number): number {
-  return angle - Math.PI / 2;
-}
-
-function reefCenterAtAngle(
-  map: WorldMap,
-  positionAngle: number,
-  ringT: number,
-): { x: number; y: number } | null {
-  const inner = coralParkReefInnerRadius(positionAngle);
-  const outer = coralParkReefOuterRadius(positionAngle);
-  for (let t = ringT; t >= 0.18; t -= 0.04) {
-    const radius = inner + (outer - inner) * t;
-    const x = CORAL_PARK_ISLAND_CX + Math.cos(positionAngle) * radius;
-    const y = CORAL_PARK_ISLAND_CY + Math.sin(positionAngle) * radius;
-    const tile = getTile(map, Math.floor(x), Math.floor(y));
-    if (tile === 'coral_rideable') {
-      return { x, y };
-    }
-  }
-  return null;
-}
-
-function isFarEnoughFromZones(center: { x: number; y: number }, zones: TrickZone[]): boolean {
-  for (const zone of zones) {
-    const gap =
-      Math.hypot(center.x - zone.center.x, center.y - zone.center.y) -
-      CORAL_PARK_TRICK_ZONE_RADIUS * 2;
-    if (gap < MIN_TRICK_CENTER_GAP) {
-      return false;
-    }
-  }
-  return true;
-}
 
 function buildTrickZones(map: WorldMap): TrickZone[] {
   const zones: TrickZone[] = [];
@@ -169,7 +136,7 @@ export function createCoralParkSlice(): GameArena {
       innerRadiusAtAngle: coralParkReefInnerRadius,
       outerRadiusAtAngle: coralParkReefOuterRadius,
       sweepRadians: Math.PI / 1.35,
-      advancePerTick: 0.022,
+      advancePerTick: 0.044,
     },
     npcs: [
       {
@@ -184,7 +151,7 @@ export function createCoralParkSlice(): GameArena {
           'Ride the wide reef loop around the island.',
           'Yellow chevrons show which way to ride through each feature.',
           'Prime a trick button 1–4 ticks before you hit the matching coral.',
-          "Tai'ura's tide submerges features — they fade out until the swell passes.",
+          "Tai'ura's tide submerges features — they wash back up somewhere new on the reef.",
         ],
       },
     ],
