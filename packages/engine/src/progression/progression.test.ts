@@ -5,8 +5,10 @@ import {
   awardTrick,
   canPurchaseUnlock,
   createProgressionState,
+  deserializeProgressionState,
   purchaseUnlock,
   rollCoralTokenDrop,
+  serializeProgressionState,
 } from './progression.js';
 import { UNLOCK_REGISTRY } from './types.js';
 
@@ -82,5 +84,33 @@ describe('progression', () => {
     const state = { ...createProgressionState(), coralTokens: 9999 };
     const unlock = UNLOCK_REGISTRY.find((entry) => entry.id === 'teeny_tai');
     expect(canPurchaseUnlock(state, unlock!).ok).toBe(false);
+  });
+
+  it('round-trips progression through serialization', () => {
+    const state = awardTrick(
+      {
+        ...createProgressionState(),
+        coralTokens: 42,
+        unlocked: new Set(['coral_rail_cosmetic']),
+        session: { tricksLanded: 7, combo: 3, maxCombo: 12 },
+      },
+      () => 1,
+    ).state;
+
+    const restored = deserializeProgressionState(serializeProgressionState(state));
+    expect(restored).toEqual(state);
+  });
+
+  it('rejects invalid serialized progression', () => {
+    expect(deserializeProgressionState(null)).toBeNull();
+    expect(deserializeProgressionState({ xp: { agility: -1, sailing: 0 } })).toBeNull();
+    expect(
+      deserializeProgressionState({
+        xp: { agility: 10, sailing: 20 },
+        coralTokens: 5,
+        unlocked: ['not_a_real_unlock'],
+        session: { tricksLanded: 1, combo: 1, maxCombo: 1 },
+      }),
+    ).toBeNull();
   });
 });

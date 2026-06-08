@@ -78,4 +78,23 @@ describe('Coral Park gameplay flow', () => {
     expect(tricked).toBe(true);
     expect(sim.consumeXpDrops().length).toBeGreaterThan(0);
   });
+
+  it('keeps combo across many ticks until a trick is bailed', () => {
+    const arena = createCoralParkSlice();
+    const sim = new GameSimulation({
+      arena,
+      initialProgression: {
+        xp: { agility: 100, sailing: 80 },
+        coralTokens: 12,
+        unlocked: new Set(),
+        session: { tricksLanded: 4, combo: 4, maxCombo: 4 },
+      },
+    });
+
+    for (let i = 0; i < 200; i += 1) {
+      sim.tick();
+    }
+
+    expect(sim.getSnapshot().progression.session.combo).toBe(4);
+  });
 });

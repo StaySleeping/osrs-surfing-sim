@@ -1,7 +1,7 @@
 import { DEFAULT_SURFBOARD_STATS, TICK_MS } from '../constants/movement.js';
 import {
   awardTrick,
-  COMBO_TIMEOUT_TICKS,
+  cloneProgressionState,
   createProgressionState,
   decayCombo,
   purchaseUnlock,
@@ -55,6 +55,7 @@ export interface SimulationConfig {
   arena: GameArena;
   stats?: SurfboardStats;
   tickMs?: number;
+  initialProgression?: ProgressionState;
 }
 
 export interface SimulationSnapshot {
@@ -70,7 +71,6 @@ export interface SimulationSnapshot {
   cursorWorldY: number | null;
   hoverHeading: number | null;
   clickValid: boolean;
-  comboTicksRemaining: number;
   tickCount: number;
   walkTargetTx: number | null;
   walkTargetTy: number | null;
@@ -101,7 +101,6 @@ export class GameSimulation {
   private cursorWorldY: number | null = null;
   private hoverHeading: number | null = null;
   private clickValid = true;
-  private comboTicksRemaining = 0;
   private tickCount = 0;
   private xpDrops: XpDropEvent[] = [];
   private npcDialogueIndex = new Map<string, number>();
@@ -130,7 +129,9 @@ export class GameSimulation {
       config.arena.spawnY,
       config.arena.spawnHeading,
     );
-    this.progression = createProgressionState();
+    this.progression = config.initialProgression
+      ? cloneProgressionState(config.initialProgression)
+      : createProgressionState();
     this.trickZones = config.arena.trickZones.map((zone) => ({ ...zone }));
     this.tide = config.arena.tide ? createTideState(config.arena.tide) : null;
     this.trickZoneTideSync = createTrickZoneTideSyncState();
@@ -155,7 +156,6 @@ export class GameSimulation {
       cursorWorldY: this.cursorWorldY,
       hoverHeading: this.hoverHeading,
       clickValid: this.clickValid,
-      comboTicksRemaining: this.comboTicksRemaining,
       tickCount: this.tickCount,
       walkTargetTx: this.walkClickMarker?.tx ?? null,
       walkTargetTy: this.walkClickMarker?.ty ?? null,
@@ -433,7 +433,6 @@ export class GameSimulation {
       isRotating: false,
     };
     this.activeTrickZoneId = null;
-    this.comboTicksRemaining = COMBO_TIMEOUT_TICKS;
     this.xpDrops.push({
       agility: result.xpGained.agility,
       sailing: result.xpGained.sailing,
@@ -561,13 +560,6 @@ export class GameSimulation {
         this.trickZoneTideSync,
         CORAL_PARK_TRICK_ZONE_COUNT,
       );
-    }
-
-    if (this.comboTicksRemaining > 0) {
-      this.comboTicksRemaining -= 1;
-      if (this.comboTicksRemaining === 0) {
-        this.progression = decayCombo(this.progression);
-      }
     }
 
     this.checkProximityDialogue();
