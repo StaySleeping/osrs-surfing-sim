@@ -149,6 +149,7 @@ export class EntityLayer {
     this.ridingBoard.visible = snapshot.boardMounted;
     this.dockBoard.visible = !snapshot.boardMounted;
     this.player.visible = true;
+    this.syncNpcs(snapshot);
 
     if (!snapshot.boardMounted) {
       const dockPos = tileToWorld3(snapshot.boardDockX, snapshot.boardDockY);
@@ -180,11 +181,9 @@ export class EntityLayer {
       );
       this.wake.rotation.set(0, rotationY, 0);
     }
-
-    this.syncNpcs(snapshot);
   }
 
-  private syncNpcs(snapshot: SimulationSnapshot): void {
+  private syncNpcs(snapshot: DisplaySimulationSnapshot): void {
     while (this.npcPool.length < snapshot.npcs.length) {
       const npc = makeNpcMesh();
       this.npcPool.push(npc);

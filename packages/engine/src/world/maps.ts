@@ -116,10 +116,12 @@ export function createCoralParkSlice(): GameArena {
 
   const southAngle = Math.PI / 2;
   const southSandR = coralParkSandRadius(southAngle);
-  const spawnX = CORAL_PARK_ISLAND_CX - 2;
-  const spawnY = CORAL_PARK_ISLAND_CY;
   const boardDockX = CORAL_PARK_ISLAND_CX;
   const boardDockY = CORAL_PARK_ISLAND_CY + southSandR - 1.5;
+  const spawnX = boardDockX - 1.2;
+  const spawnY = boardDockY - 1.8;
+  const guruX = boardDockX + 1.2;
+  const guruY = boardDockY - 1.5;
 
   return {
     map,
@@ -143,8 +145,8 @@ export function createCoralParkSlice(): GameArena {
       {
         id: 'guru',
         name: 'Kaulu the Surf Guru',
-        x: CORAL_PARK_ISLAND_CX,
-        y: CORAL_PARK_ISLAND_CY,
+        x: guruX,
+        y: guruY,
         interactRadius: 0.9,
         dialogue: [
           'Welcome to Coral Park, surfer!',

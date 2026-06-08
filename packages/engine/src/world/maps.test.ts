@@ -61,7 +61,8 @@ describe('createCoralParkSlice', () => {
   it('spawns on the island with the board on the sand ring and spaced reef tricks', () => {
     const arena = createCoralParkSlice();
 
-    expect(mapTile(arena.map, arena.spawnX, arena.spawnY)).toBe('grass');
+    expect(mapTile(arena.map, arena.spawnX, arena.spawnY)).toBe('sand');
+    expect(mapTile(arena.map, arena.npcs[0].x, arena.npcs[0].y)).toBe('sand');
     expect(mapTile(arena.map, arena.boardDockX, arena.boardDockY)).toBe('sand');
     expect(arena.npcs).toHaveLength(1);
     expect(arena.trickZones.length).toBeGreaterThanOrEqual(12);
