@@ -1,0 +1,29 @@
+---
+description: Engine package conventions for the OSRS surfing simulator
+globs: packages/engine/**/*.ts
+alwaysApply: false
+---
+
+# Engine package (`@osrs-surfing/engine`)
+
+## Architecture
+
+- **Pure simulation** — no DOM, Pixi, or renderer imports in `packages/engine`.
+- **Snapshots** — client consumes `SimulationSnapshot` from `simulation.ts`; keep render concerns out of engine.
+- **Monorepo** — client depends on engine; engine must not depend on client.
+
+## World / tide modules
+
+| Module | Role |
+| ------ | ---- |
+| `world/features.ts` | Trick zones, tide state, alpha, submersion |
+| `world/trickZonePlacement.ts` | Spawn, sync, slot angles |
+| `world/maps.ts` | `createCoralParkSlice` arena |
+| `world/coralParkCoast.ts` | Organic reef radii |
+| `game/simulation.ts` | Tick loop, tide advance, trick sync |
+
+## Conventions
+
+- Export constants for magic numbers (tide arcs, gaps, fade progress).
+- Phase math uses `normalizeAngle`, `phaseInProgressRange`, `progressInPhaseRange` — handle wrap at 2π.
+- Use conventional commit messages; run `pnpm validate` before finishing.

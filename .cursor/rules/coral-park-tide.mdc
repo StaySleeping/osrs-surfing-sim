@@ -1,0 +1,32 @@
+---
+description: Coral Park tide cycle, trick feature placement, and fade timing
+globs: packages/engine/src/world/features.ts,packages/engine/src/world/trickZonePlacement.ts,packages/engine/src/world/maps.ts,packages/engine/src/world/coralParkCoast.ts,packages/client/src/render/PixiRenderer.ts
+alwaysApply: false
+---
+
+# Coral Park tide & features
+
+Read [docs/CORAL_PARK.md](docs/CORAL_PARK.md) before changing tide or feature behaviour.
+
+## Placement rules
+
+- **15 slots** at fixed angles (`trickSlotAngle`) — never spawn by submerged-arc angle.
+- **Random radial depth** per spawn (`randomRingDepth`), with gap enforcement (`MIN_TRICK_CENTER_GAP`).
+- Do not use slot-indexed depth arrays (`depth[slot % N]`).
+
+## Tide lifecycle (per slot angle θ)
+
+1. Entry → reroll: old feature fades **opaque → transparent**; gameplay disabled.
+2. **Reroll** at `HIGH_TIDE_REROLL_PROGRESS` (just before high-tide centre): purge old, spawn new with `spawnedAtHighTide: true`.
+3. Reroll → low tide: new feature fades **transparent → opaque** underwater; still disabled.
+4. Low tide (trailing edge): fully opaque; gameplay enabled.
+
+## Common bugs to avoid
+
+- **Re-roll loop:** never purge zones with `spawnedAtHighTide` while phase is still between reroll and low tide.
+- **Alpha vs gameplay:** `trickZoneVisualAlpha(zone, tide)` for rendering; `isTrickZoneSubmerged` for interaction.
+- **Renderer:** pass `tide` into `trickZoneVisualAlpha` in `PixiRenderer.drawTrickZones`.
+
+## Tests
+
+After changes, run `pnpm test` — see `features.test.ts` and `trickZonePlacement.test.ts`.
