@@ -55,10 +55,10 @@ export class OsrsOrbitCamera {
       this.yaw += ARROW_YAW_SPEED * deltaSeconds;
     }
     if (this.arrowUp) {
-      this.pitch = Math.min(MAX_PITCH, this.pitch + ARROW_PITCH_SPEED * deltaSeconds);
+      this.pitch = Math.max(MIN_PITCH, this.pitch - ARROW_PITCH_SPEED * deltaSeconds);
     }
     if (this.arrowDown) {
-      this.pitch = Math.max(MIN_PITCH, this.pitch - ARROW_PITCH_SPEED * deltaSeconds);
+      this.pitch = Math.min(MAX_PITCH, this.pitch + ARROW_PITCH_SPEED * deltaSeconds);
     }
 
     const cosPitch = Math.cos(this.pitch);
@@ -136,7 +136,7 @@ export class OsrsOrbitCamera {
     this.yaw += dx * MIDDLE_MOUSE_SENSITIVITY;
     this.pitch = Math.max(
       MIN_PITCH,
-      Math.min(MAX_PITCH, this.pitch - dy * MIDDLE_MOUSE_SENSITIVITY),
+      Math.min(MAX_PITCH, this.pitch + dy * MIDDLE_MOUSE_SENSITIVITY),
     );
   }
 
