@@ -1,0 +1,9 @@
+node_modules
+dist
+*.local
+.DS_Store
+packages/client/test-results
+packages/client/playwright-report
+
+comment.md
+submission.md
