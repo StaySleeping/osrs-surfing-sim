@@ -20,6 +20,7 @@ import {
   clockwiseTangent,
   CORAL_PARK_TRICK_ZONE_RADIUS,
   isFarEnoughFromZones,
+  REEF_RING_DEPTHS,
   reefCenterAtAngle,
   TRICK_FEATURE_TYPES,
   TRICK_TYPE_TO_PREPARE_SLOT,
@@ -45,7 +46,6 @@ export interface GameArena {
   npcs: NpcDefinition[];
 }
 
-const TRICK_RING_POSITIONS = [0.32, 0.62, 0.88];
 export const CORAL_PARK_TRICK_ZONE_COUNT = 15;
 
 function buildTrickZones(map: WorldMap): TrickZone[] {
@@ -54,7 +54,7 @@ function buildTrickZones(map: WorldMap): TrickZone[] {
 
   for (let i = 0; i < CORAL_PARK_TRICK_ZONE_COUNT; i += 1) {
     const positionAngle = i * angleStep + 0.22;
-    const ringT = TRICK_RING_POSITIONS[i % TRICK_RING_POSITIONS.length];
+    const ringT = REEF_RING_DEPTHS[i % REEF_RING_DEPTHS.length];
     const center = reefCenterAtAngle(map, positionAngle, ringT);
     if (!center || !isFarEnoughFromZones(center, zones)) {
       continue;
@@ -143,7 +143,7 @@ export function createCoralParkSlice(): GameArena {
           'Ride the wide reef loop around the island.',
           'Yellow chevrons show which way to ride through each feature.',
           'Prime a trick button 1–4 ticks before you hit the matching coral.',
-          "Tai'ura's tide submerges features — new ones wash up wherever the reef dries out.",
+          "Tai'ura's tide submerges features — they fade underwater, then fresh coral rises as the swell passes.",
         ],
       },
     ],

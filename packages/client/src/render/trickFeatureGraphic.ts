@@ -330,10 +330,12 @@ export function drawTrickFeature(
   screenY: number,
   pixelRadius: number,
   zone: TrickZone,
+  interactionDisabled = false,
+  visualAlpha = 1,
 ): void {
   const r = pixelRadius;
   const rotation = zone.rotationRadians;
-  const alpha = zone.tricked ? TRICKED_ALPHA : 1;
+  const alpha = zone.tricked ? TRICKED_ALPHA : visualAlpha;
   const palette = paletteFor(zone.type, zone.tricked);
 
   switch (zone.type) {
@@ -357,7 +359,7 @@ export function drawTrickFeature(
       break;
   }
 
-  if (!zone.tricked) {
+  if (!zone.tricked && !interactionDisabled) {
     drawApproachChevrons(g, screenX, screenY, r, rotation, palette.approach, 1);
   }
 }

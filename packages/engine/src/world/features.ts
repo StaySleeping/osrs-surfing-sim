@@ -11,6 +11,14 @@ export const TRICK_APPROACH_TOLERANCE_DEG = 70;
 
 export type TrickFeatureType = 'rail' | 'tunnel' | 'brain_coral' | 'wall_ride' | 'jump';
 
+/** Render alpha when a feature is fully submerged (gameplay still uses the binary tide check). */
+export const TRICK_SUBMERGED_ALPHA = 0.28;
+
+/** Ticks to ease alpha when submerging or resurfacing. */
+export const TRICK_SUBMERGE_FADE_TICKS = 10;
+
+export const TRICK_TRICKED_ALPHA = 0.42;
+
 export interface TrickZone {
   id: string;
   type: TrickFeatureType;
@@ -21,6 +29,25 @@ export interface TrickZone {
   /** World radians — ride toward +local Y through the feature (OSRS 0=east, clockwise). */
   rotationRadians: number;
   tricked: boolean;
+  /** Ticks spent submerged this cycle — drives fade-out (set by tide sync). */
+  submergedRenderTicks?: number;
+  /** Ticks since resurfacing — drives fade-in (set by tide sync). */
+  emergedRenderTicks?: number;
+}
+
+export function trickZoneVisualAlpha(zone: TrickZone): number {
+  if (zone.tricked) {
+    return TRICK_TRICKED_ALPHA;
+  }
+  if (zone.submergedRenderTicks !== undefined) {
+    const t = Math.min(1, zone.submergedRenderTicks / TRICK_SUBMERGE_FADE_TICKS);
+    return 1 - t * (1 - TRICK_SUBMERGED_ALPHA);
+  }
+  if (zone.emergedRenderTicks !== undefined) {
+    const t = Math.min(1, zone.emergedRenderTicks / TRICK_SUBMERGE_FADE_TICKS);
+    return TRICK_SUBMERGED_ALPHA + t * (1 - TRICK_SUBMERGED_ALPHA);
+  }
+  return 1;
 }
 
 export interface TrickPrepareState {

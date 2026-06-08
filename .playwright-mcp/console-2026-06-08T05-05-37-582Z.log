@@ -23,3 +23,18 @@
     at OsrsClient.onGameTick (http://localhost:5173/src/OsrsClient.ts?t=1780898745139:193:21)
     at OsrsClient.onVisualFrame (http://localhost:5173/src/OsrsClient.ts?t=1780898745139:227:16)
     at http://localhost:5173/src/OsrsClient.ts?t=1780898745139:234:67
+[ 6933577ms] ReferenceError: SUBMERGED_ALPHA is not defined
+    at drawTrickFeature (http://localhost:5173/src/render/trickFeatureGraphic.ts?t=1780902070943:226:60)
+    at PixiRenderer.drawTrickZones (http://localhost:5173/src/render/PixiRenderer.ts?t=1780902070943:221:7)
+    at PixiRenderer.render (http://localhost:5173/src/render/PixiRenderer.ts?t=1780902070943:110:10)
+    at OsrsClient.renderVisuals (http://localhost:5173/src/OsrsClient.ts?t=1780902070943:247:19)
+    at OsrsClient.onVisualFrame (http://localhost:5173/src/OsrsClient.ts?t=1780902070943:230:14)
+    at http://localhost:5173/src/OsrsClient.ts?t=1780902070943:234:67
+[ 6935144ms] ReferenceError: submerged is not defined
+    at drawTrickFeature (http://localhost:5173/src/render/trickFeatureGraphic.ts?t=1780902072525:248:25)
+    at PixiRenderer.drawTrickZones (http://localhost:5173/src/render/PixiRenderer.ts?t=1780902072525:221:7)
+    at PixiRenderer.render (http://localhost:5173/src/render/PixiRenderer.ts?t=1780902072525:110:10)
+    at OsrsClient.renderVisuals (http://localhost:5173/src/OsrsClient.ts?t=1780902072525:247:19)
+    at OsrsClient.onVisualFrame (http://localhost:5173/src/OsrsClient.ts?t=1780902072525:230:14)
+    at http://localhost:5173/src/OsrsClient.ts?t=1780902072525:234:67
+[ 6937905ms] The requested module '/@fs/Users/jamesg/Projects/osrs-surfing-sim/packages/engine/dist/index.js?t=1780901759430' does not provide an export named 'trickZoneVisualAlpha'

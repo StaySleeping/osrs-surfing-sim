@@ -124,7 +124,7 @@ export class GameSimulation {
     this.progression = createProgressionState();
     this.trickZones = config.arena.trickZones.map((zone) => ({ ...zone }));
     this.tide = config.arena.tide ? createTideState(config.arena.tide) : null;
-    this.trickZoneTideSync = createTrickZoneTideSyncState(this.tide);
+    this.trickZoneTideSync = createTrickZoneTideSyncState();
   }
 
   getSnapshot(): SimulationSnapshot {

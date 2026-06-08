@@ -7,9 +7,10 @@ import {
   coralParkReefOuterRadius,
 } from './coralParkCoast.js';
 import {
+  isAngleInSweep,
   isPointInTideSweep,
   isTrickZoneSubmerged,
-  tideTrailingEdgeRadians,
+  TRICK_SUBMERGE_FADE_TICKS,
   type TideState,
   type TrickFeatureType,
   type TrickZone,
@@ -17,6 +18,9 @@ import {
 
 export const CORAL_PARK_TRICK_ZONE_RADIUS = 4;
 export const MIN_TRICK_CENTER_GAP = 12;
+
+/** Tide travel while submerged before a feature is removed (radians). */
+export const SUBMERGED_PURGE_ARC = 0.42;
 
 export const TRICK_FEATURE_TYPES: TrickFeatureType[] = [
   'rail',
@@ -34,17 +38,19 @@ export const TRICK_TYPE_TO_PREPARE_SLOT: Record<TrickFeatureType, TrickPrepareSl
   wall_ride: 1,
 };
 
+/** Matches initial buildTrickZones offset in maps.ts. */
+export const TRICK_SLOT_OFFSET = 0.22;
+
 /** Radial depth along the reef ring (0 = inner edge, 1 = outer edge). */
-const REEF_RING_POSITIONS = [0.32, 0.62, 0.88];
+export const REEF_RING_DEPTHS = [0.32, 0.62, 0.88];
+
 const COUNTER_RIDE_CHANCE = 0.2;
 const TAU = Math.PI * 2;
-/** Small clockwise offset past the trailing edge so spawns sit on dry reef. */
-const SPAWN_DRY_OFFSET = 0.08;
 
 export interface TrickZoneTideSyncState {
-  /** Previous tick trailing-edge angle, used to detect slot crossings. */
-  lastTrailingEdge: number;
   nextZoneId: number;
+  submergedTicks: Map<string, number>;
+  emergedTicks: Map<string, number>;
 }
 
 /** Clockwise reef ride tangent at a given polar angle. */
@@ -52,11 +58,30 @@ export function clockwiseTangent(angle: number): number {
   return angle - Math.PI / 2;
 }
 
-export function createTrickZoneTideSyncState(tide: TideState | null): TrickZoneTideSyncState {
+export function createTrickZoneTideSyncState(): TrickZoneTideSyncState {
   return {
-    lastTrailingEdge: tide ? tideTrailingEdgeRadians(tide) : 0,
     nextZoneId: 1000,
+    submergedTicks: new Map(),
+    emergedTicks: new Map(),
   };
+}
+
+export function trickSlotAngle(slot: number, targetCount: number): number {
+  return normalizeSpawnAngle(TRICK_SLOT_OFFSET + slot * (TAU / targetCount));
+}
+
+/** Sample angle inside the current submerged arc for pre-seeding a slot. */
+export function submergedArcSlotAngle(slot: number, targetCount: number, tide: TideState): number {
+  const spacing = tide.sweepRadians / targetCount;
+  return normalizeSpawnAngle(tide.phaseRadians + spacing * (slot + 0.5));
+}
+
+export function zonePolarAngle(zone: TrickZone, tide: TideState): number {
+  return Math.atan2(zone.center.y - tide.centerY, zone.center.x - tide.centerX);
+}
+
+export function zonePolarRadius(zone: TrickZone, tide: TideState): number {
+  return Math.hypot(zone.center.x - tide.centerX, zone.center.y - tide.centerY);
 }
 
 export function reefCenterAtAngle(
@@ -97,7 +122,7 @@ export function pickRandomTrickType(random: () => number = Math.random): TrickFe
   return TRICK_FEATURE_TYPES[Math.floor(random() * TRICK_FEATURE_TYPES.length)];
 }
 
-/** Spawn a single trick feature on exposed reef at the given polar angle. */
+/** Spawn a trick feature on the reef ring at the given polar angle. */
 export function createTrickZoneAtAngle(
   map: WorldMap,
   positionAngle: number,
@@ -106,13 +131,20 @@ export function createTrickZoneAtAngle(
   existingZones: TrickZone[],
   random: () => number = Math.random,
   enforceGap = true,
+  preferredRingDepth?: number,
+  allowSubmerged = false,
 ): TrickZone | null {
-  for (const ringT of REEF_RING_POSITIONS) {
+  const ringDepths =
+    preferredRingDepth !== undefined
+      ? [preferredRingDepth, ...REEF_RING_DEPTHS.filter((depth) => depth !== preferredRingDepth)]
+      : REEF_RING_DEPTHS;
+
+  for (const ringT of ringDepths) {
     const center = reefCenterAtAngle(map, positionAngle, ringT);
     if (!center || (enforceGap && !isFarEnoughFromZones(center, existingZones))) {
       continue;
     }
-    if (isPointInTideSweep(center.x, center.y, tide)) {
+    if (!allowSubmerged && isPointInTideSweep(center.x, center.y, tide)) {
       continue;
     }
 
@@ -137,8 +169,8 @@ export function createTrickZoneAtAngle(
 }
 
 /**
- * Remove features submerged by the swell and spawn replacements evenly along
- * the currently exposed (dry) reef arc.
+ * Keep submerged features visible-but-disabled, purge after a short submerged arc,
+ * and pre-seed replacements inside the submerged band at fixed slot angles.
  */
 export function syncTrickZonesWithTide(
   zones: TrickZone[],
@@ -148,34 +180,106 @@ export function syncTrickZonesWithTide(
   targetCount: number,
   random: () => number = Math.random,
 ): TrickZone[] {
-  let active = zones.filter((zone) => !isTrickZoneSubmerged(zone, tide));
+  const slotTolerance = (TAU / targetCount) * 0.35;
+  const active: TrickZone[] = [];
 
-  const trailingEdge = tideTrailingEdgeRadians(tide);
-  const dryStart = normalizeSpawnAngle(trailingEdge + SPAWN_DRY_OFFSET);
-  const drySpan = TAU - tide.sweepRadians;
-  const spacing = drySpan / targetCount;
-  const slotTolerance = spacing * 0.35;
+  for (const zone of zones) {
+    const submerged = isTrickZoneSubmerged(zone, tide);
+    if (!submerged) {
+      state.submergedTicks.delete(zone.id);
+      const emerged = (state.emergedTicks.get(zone.id) ?? 0) + 1;
+      if (emerged <= TRICK_SUBMERGE_FADE_TICKS) {
+        state.emergedTicks.set(zone.id, emerged);
+        active.push({ ...zone, emergedRenderTicks: emerged, submergedRenderTicks: undefined });
+      } else {
+        state.emergedTicks.delete(zone.id);
+        active.push({ ...zone, emergedRenderTicks: undefined, submergedRenderTicks: undefined });
+      }
+      continue;
+    }
 
-  for (let slot = 0; slot < targetCount && active.length < targetCount; slot += 1) {
-    const slotAngle = normalizeSpawnAngle(dryStart + spacing * (slot + 0.5));
-    active = trySpawnAtSlot(active, map, tide, slotAngle, slotTolerance, state, random);
+    state.emergedTicks.delete(zone.id);
+    const ticks = (state.submergedTicks.get(zone.id) ?? 0) + 1;
+    state.submergedTicks.set(zone.id, ticks);
+    const submergedArc = ticks * tide.advancePerTick;
+    if (submergedArc >= SUBMERGED_PURGE_ARC) {
+      state.submergedTicks.delete(zone.id);
+      continue;
+    }
+
+    const renderTicks = Math.max(
+      zone.submergedRenderTicks ?? 0,
+      Math.min(TRICK_SUBMERGE_FADE_TICKS, ticks),
+    );
+    active.push({
+      ...zone,
+      submergedRenderTicks: renderTicks,
+      emergedRenderTicks: undefined,
+    });
   }
 
-  state.lastTrailingEdge = trailingEdge;
+  for (let slot = 0; slot < targetCount; slot += 1) {
+    if (active.length >= targetCount) {
+      break;
+    }
+
+    if (isSlotOccupied(active, tide, slot, targetCount, slotTolerance)) {
+      continue;
+    }
+
+    const slotAngle = trickSlotAngle(slot, targetCount);
+
+    const preseedAngle = submergedArcSlotAngle(slot, targetCount, tide);
+    const inSubmergedBand = isAngleInSweep(preseedAngle, tide.phaseRadians, tide.sweepRadians);
+    const spawnAngle = inSubmergedBand ? preseedAngle : slotAngle;
+
+    const spawned = createTrickZoneAtAngle(
+      map,
+      spawnAngle,
+      tide,
+      `feature-${state.nextZoneId}`,
+      active,
+      random,
+      false,
+      REEF_RING_DEPTHS[slot % REEF_RING_DEPTHS.length],
+      true,
+    );
+
+    if (!spawned) {
+      continue;
+    }
+
+    state.nextZoneId += 1;
+    if (isTrickZoneSubmerged(spawned, tide)) {
+      state.submergedTicks.set(spawned.id, 0);
+      active.push({
+        ...spawned,
+        submergedRenderTicks: TRICK_SUBMERGE_FADE_TICKS,
+        emergedRenderTicks: undefined,
+      });
+    } else {
+      active.push(spawned);
+    }
+  }
+
   return active;
 }
 
-function hasZoneNearAngle(
+function isSlotOccupied(
   zones: TrickZone[],
   tide: TideState,
-  angle: number,
+  slot: number,
+  targetCount: number,
   tolerance: number,
 ): boolean {
-  return zones.some((zone) => angleNear(zonePolarAngle(zone, tide), angle, tolerance));
-}
-
-function zonePolarAngle(zone: TrickZone, tide: TideState): number {
-  return Math.atan2(zone.center.y - tide.centerY, zone.center.x - tide.centerX);
+  const slotAngle = trickSlotAngle(slot, targetCount);
+  const preseedAngle = submergedArcSlotAngle(slot, targetCount, tide);
+  return zones.some((zone) => {
+    const zoneAngle = zonePolarAngle(zone, tide);
+    return (
+      angleNear(zoneAngle, slotAngle, tolerance) || angleNear(zoneAngle, preseedAngle, tolerance)
+    );
+  });
 }
 
 function angleNear(a: number, b: number, tolerance: number): boolean {
@@ -184,38 +288,6 @@ function angleNear(a: number, b: number, tolerance: number): boolean {
     diff = TAU - diff;
   }
   return diff <= tolerance;
-}
-
-function trySpawnAtSlot(
-  active: TrickZone[],
-  map: WorldMap,
-  tide: TideState,
-  slotAngle: number,
-  slotTolerance: number,
-  state: TrickZoneTideSyncState,
-  random: () => number,
-): TrickZone[] {
-  if (hasZoneNearAngle(active, tide, slotAngle, slotTolerance)) {
-    return active;
-  }
-
-  const spawnAngle = normalizeSpawnAngle(slotAngle);
-  const spawned = createTrickZoneAtAngle(
-    map,
-    spawnAngle,
-    tide,
-    `feature-${state.nextZoneId}`,
-    active,
-    random,
-    false,
-  );
-
-  if (!spawned) {
-    return active;
-  }
-
-  state.nextZoneId += 1;
-  return [...active, spawned];
 }
 
 function normalizeSpawnAngle(radians: number): number {
