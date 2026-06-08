@@ -44,7 +44,7 @@ body,
 
 .osrs-window-top {
   height: 4px;
-  background: url('/assets/osrs/fixed_mode/window_frame_edge_top.png') repeat-x;
+  background: var(--osrs-url-window-top) repeat-x;
   background-size: auto 4px;
 }
 
@@ -86,7 +86,7 @@ body,
   height: 169px;
   display: flex;
   flex-direction: column;
-  background: url('/assets/osrs/chatbox/background.png') no-repeat;
+  background: var(--osrs-url-chatbox-bg) no-repeat;
   background-size: 512px 142px;
   background-position: top left;
   border-right: 1px solid #2e281d;
@@ -139,9 +139,9 @@ body,
   height: 164px;
   flex-shrink: 0;
   background:
-    url('/assets/osrs/fixed_mode/minimap_left_edge.png') no-repeat left top,
-    url('/assets/osrs/fixed_mode/minimap_right_edge.png') no-repeat right top,
-    url('/assets/osrs/fixed_mode/minimap_and_compass_frame.png') no-repeat center top;
+    var(--osrs-url-minimap-left) no-repeat left top,
+    var(--osrs-url-minimap-right) no-repeat right top,
+    var(--osrs-url-minimap-frame) no-repeat center top;
   background-size:
     29px 156px,
     48px 156px,
@@ -170,14 +170,14 @@ body,
   left: 2px;
   width: 249px;
   height: 8px;
-  background: url('/assets/osrs/fixed_mode/minimap_frame_bottom.png') no-repeat;
+  background: var(--osrs-url-minimap-bottom) no-repeat;
 }
 
 .osrs-tab-strip {
   width: 253px;
   height: 37px;
   flex-shrink: 0;
-  background: url('/assets/osrs/fixed_mode/tabs_top_row.png') no-repeat center;
+  background: var(--osrs-url-tabs-top) no-repeat center;
   background-size: 249px 38px;
   padding: 2px 4px;
 }
@@ -210,7 +210,7 @@ body,
 .osrs-interface-panel {
   flex: 1;
   width: 253px;
-  background: url('/assets/osrs/fixed_mode/side_panel_background.png') repeat;
+  background: var(--osrs-url-side-panel) repeat;
   overflow: hidden;
   border-top: 1px solid #544834;
 }
@@ -461,9 +461,9 @@ body,
   overflow-y: auto;
   z-index: 20;
   background:
-    url('/assets/osrs/fixed_mode/minimap_left_edge.png') repeat-y left,
-    url('/assets/osrs/fixed_mode/minimap_right_edge.png') repeat-y right,
-    url('/assets/osrs/fixed_mode/side_panel_background.png') repeat;
+    var(--osrs-url-minimap-left) repeat-y left,
+    var(--osrs-url-minimap-right) repeat-y right,
+    var(--osrs-url-side-panel) repeat;
   background-size:
     8px auto,
     8px auto,
