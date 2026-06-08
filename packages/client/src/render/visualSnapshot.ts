@@ -1,72 +1,65 @@
 import {
-  DEGREES_PER_HEADING,
-  headingToDegrees,
   interpolateHeadingIndex,
   type HeadingIndex,
   type SimulationSnapshot,
   type WorldPos,
 } from '@osrs-surfing/engine';
 
-function headingDeltaDegrees(from: HeadingIndex, to: HeadingIndex): number {
-  const fromDeg = headingToDegrees(from);
-  const toDeg = headingToDegrees(to);
-  let delta = toDeg - fromDeg;
-  if (delta > 180) {
-    delta -= 360;
-  }
-  if (delta < -180) {
-    delta += 360;
-  }
-  return delta;
+function lerpPosition(from: WorldPos, to: WorldPos, t: number): WorldPos {
+  return {
+    x: from.x + (to.x - from.x) * t,
+    y: from.y + (to.y - from.y) * t,
+  };
 }
 
-/** Integrates surfboard motion at constant velocity between simulation ticks. */
+function positionDistance(a: WorldPos, b: WorldPos): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+/**
+ * Renders the player between simulation ticks by lerping from the pre-tick
+ * position to the post-tick position over exactly one game tick (600ms).
+ * Progress is driven by the tick accumulator (0 … 1 within each tick).
+ */
 export class SurfboardMotionInterpolator {
-  private displayPosition: WorldPos = { x: 0, y: 0 };
-  private displayCurrentHeading = 0;
-  private displayIntendedHeading = 0;
-  private velocityPerMs: WorldPos = { x: 0, y: 0 };
-  private currentHeadingVelocityDegPerMs = 0;
-  private intendedHeadingVelocityDegPerMs = 0;
+  private segmentStart: WorldPos = { x: 0, y: 0 };
+  private segmentEnd: WorldPos = { x: 0, y: 0 };
+  private headingStart: HeadingIndex = 0;
+  private headingEnd: HeadingIndex = 0;
+  private intendedHeadingStart: HeadingIndex = 0;
+  private intendedHeadingEnd: HeadingIndex = 0;
 
   reset(snapshot: SimulationSnapshot): void {
-    this.displayPosition = { ...snapshot.surfboard.position };
-    this.displayCurrentHeading = snapshot.surfboard.currentHeading;
-    this.displayIntendedHeading = snapshot.surfboard.intendedHeading;
-    this.velocityPerMs = { x: 0, y: 0 };
-    this.currentHeadingVelocityDegPerMs = 0;
-    this.intendedHeadingVelocityDegPerMs = 0;
+    const pos = { ...snapshot.surfboard.position };
+    this.segmentStart = pos;
+    this.segmentEnd = pos;
+    this.headingStart = snapshot.surfboard.currentHeading;
+    this.headingEnd = snapshot.surfboard.currentHeading;
+    this.intendedHeadingStart = snapshot.surfboard.intendedHeading;
+    this.intendedHeadingEnd = snapshot.surfboard.intendedHeading;
   }
 
-  onSimulationTick(before: SimulationSnapshot, after: SimulationSnapshot, tickMs: number): void {
-    this.displayPosition = { ...before.surfboard.position };
-    this.displayCurrentHeading = before.surfboard.currentHeading;
-    this.displayIntendedHeading = before.surfboard.intendedHeading;
-
-    const dt = tickMs;
-    this.velocityPerMs = {
-      x: (after.surfboard.position.x - before.surfboard.position.x) / dt,
-      y: (after.surfboard.position.y - before.surfboard.position.y) / dt,
-    };
-    this.currentHeadingVelocityDegPerMs =
-      headingDeltaDegrees(before.surfboard.currentHeading, after.surfboard.currentHeading) / dt;
-    this.intendedHeadingVelocityDegPerMs =
-      headingDeltaDegrees(before.surfboard.intendedHeading, after.surfboard.intendedHeading) / dt;
+  onSimulationTick(before: SimulationSnapshot, after: SimulationSnapshot): void {
+    this.segmentStart = { ...before.surfboard.position };
+    this.segmentEnd = { ...after.surfboard.position };
+    this.headingStart = before.surfboard.currentHeading;
+    this.headingEnd = after.surfboard.currentHeading;
+    this.intendedHeadingStart = before.surfboard.intendedHeading;
+    this.intendedHeadingEnd = after.surfboard.intendedHeading;
   }
 
-  advance(deltaMs: number): void {
-    if (deltaMs <= 0) {
-      return;
+  /**
+   * Re-align when the sim teleports (board mount, test bridge ticks, etc.)
+   * without a matching motion segment update.
+   */
+  ensureSynced(snapshot: SimulationSnapshot): void {
+    const simPos = snapshot.surfboard.position;
+    const segmentLength = positionDistance(this.segmentStart, this.segmentEnd);
+    const simToEnd = positionDistance(simPos, this.segmentEnd);
+
+    if (simToEnd > Math.max(0.2, segmentLength * 0.5 + 0.05)) {
+      this.reset(snapshot);
     }
-
-    this.displayPosition = {
-      x: this.displayPosition.x + this.velocityPerMs.x * deltaMs,
-      y: this.displayPosition.y + this.velocityPerMs.y * deltaMs,
-    };
-    this.displayCurrentHeading +=
-      (this.currentHeadingVelocityDegPerMs * deltaMs) / DEGREES_PER_HEADING;
-    this.displayIntendedHeading +=
-      (this.intendedHeadingVelocityDegPerMs * deltaMs) / DEGREES_PER_HEADING;
   }
 
   buildDisplaySnapshot(
@@ -74,9 +67,10 @@ export class SurfboardMotionInterpolator {
     tidePhaseFrom: number | null,
     tickBlend: number,
   ): SimulationSnapshot {
+    const t = Math.min(1, Math.max(0, tickBlend));
+
     let displayTide = snapshot.tide;
     if (snapshot.tide && tidePhaseFrom !== null) {
-      const t = Math.min(1, Math.max(0, tickBlend));
       const phaseRadians = tidePhaseFrom + snapshot.tide.advancePerTick * t;
       displayTide = { ...snapshot.tide, phaseRadians };
     }
@@ -85,56 +79,15 @@ export class SurfboardMotionInterpolator {
       ...snapshot,
       surfboard: {
         ...snapshot.surfboard,
-        position: { ...this.displayPosition },
-        currentHeading: this.displayCurrentHeading,
-        intendedHeading: this.displayIntendedHeading,
+        position: lerpPosition(this.segmentStart, this.segmentEnd, t),
+        currentHeading: interpolateHeadingIndex(this.headingStart, this.headingEnd, t),
+        intendedHeading: interpolateHeadingIndex(
+          this.intendedHeadingStart,
+          this.intendedHeadingEnd,
+          t,
+        ),
       },
       tide: displayTide,
     };
   }
-}
-
-/** @deprecated Use SurfboardMotionInterpolator for client rendering. */
-export function buildDisplaySnapshot(
-  snapshot: SimulationSnapshot,
-  positionFrom: WorldPos,
-  headingFrom: HeadingIndex,
-  intendedHeadingFrom: HeadingIndex,
-  tidePhaseFrom: number | null,
-  tickBlend: number,
-): SimulationSnapshot {
-  const t = Math.min(1, Math.max(0, tickBlend));
-  const target = snapshot.surfboard.position;
-  const displayPos: WorldPos = {
-    x: positionFrom.x + (target.x - positionFrom.x) * t,
-    y: positionFrom.y + (target.y - positionFrom.y) * t,
-  };
-
-  const displayCurrentHeading = interpolateHeadingIndex(
-    headingFrom,
-    snapshot.surfboard.currentHeading,
-    t,
-  );
-  const displayIntendedHeading = interpolateHeadingIndex(
-    intendedHeadingFrom,
-    snapshot.surfboard.intendedHeading,
-    t,
-  );
-
-  let displayTide = snapshot.tide;
-  if (snapshot.tide && tidePhaseFrom !== null) {
-    const phaseRadians = tidePhaseFrom + snapshot.tide.advancePerTick * t;
-    displayTide = { ...snapshot.tide, phaseRadians };
-  }
-
-  return {
-    ...snapshot,
-    surfboard: {
-      ...snapshot.surfboard,
-      position: displayPos,
-      currentHeading: displayCurrentHeading,
-      intendedHeading: displayIntendedHeading,
-    },
-    tide: displayTide,
-  };
 }

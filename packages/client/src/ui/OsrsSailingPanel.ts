@@ -1,5 +1,7 @@
 import {
   agilityLevel,
+  comboTierName,
+  comboTierProgress,
   sailingLevel,
   type SimulationSnapshot,
   type SpeedState,
@@ -7,7 +9,17 @@ import {
 
 import { OSRS_ASSETS } from './osrsAssets.js';
 
-import type { TrickPrepareSlot } from '@osrs-surfing/engine';
+import type { ComboTierName, TrickPrepareSlot } from '@osrs-surfing/engine';
+
+const COMBO_TIER_BAR_COLORS: Record<ComboTierName, string> = {
+  Bronze: 'linear-gradient(180deg, #e8a55c 0%, #8b5a2b 100%)',
+  Iron: 'linear-gradient(180deg, #d8d8d8 0%, #6a6a6a 100%)',
+  Steel: 'linear-gradient(180deg, #c8d4e0 0%, #6a7a8a 100%)',
+  Mithril: 'linear-gradient(180deg, #7eb8e8 0%, #2a5080 100%)',
+  Adamant: 'linear-gradient(180deg, #5ecf8a 0%, #1a5c38 100%)',
+  Rune: 'linear-gradient(180deg, #7ec8f0 0%, #2868a8 100%)',
+  Dragon: 'linear-gradient(180deg, #f0a050 0%, #8b2020 100%)',
+};
 
 export interface OsrsSailingPanelCallbacks {
   onSpeedState: (state: SpeedState) => void;
@@ -49,9 +61,10 @@ export class OsrsSailingPanel {
     const comboLabel = this.root.querySelector('#combo-label');
     if (comboFill && comboLabel) {
       const combo = snapshot.progression.session.combo;
-      const pct = Math.min(100, combo * 20);
-      comboFill.style.width = `${pct}%`;
-      comboLabel.textContent = combo > 0 ? `Combo x${combo}` : 'Combo';
+      const progress = comboTierProgress(combo);
+      comboFill.style.width = combo > 0 ? `${(progress / 10) * 100}%` : '0%';
+      comboFill.style.background = COMBO_TIER_BAR_COLORS[comboTierName(combo)];
+      comboLabel.textContent = combo > 0 ? `${comboTierName(combo)} · ${combo}` : 'Combo';
     }
 
     const agility = snapshot.progression.xp.agility;

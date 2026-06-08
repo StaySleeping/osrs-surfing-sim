@@ -39,6 +39,7 @@ import {
   type TrickZone,
 } from '../world/features.js';
 import type { GameArena } from '../world/maps.js';
+import { relocateTrickZoneOnReef } from '../world/trickZonePlacement.js';
 
 export interface SimulationConfig {
   arena: GameArena;
@@ -403,8 +404,7 @@ export class GameSimulation {
       return;
     }
 
-    const comboMultiplier = Math.max(1, this.progression.session.combo);
-    const result = awardTrick(this.progression, comboMultiplier);
+    const result = awardTrick(this.progression);
     this.progression = result.state;
     this.trickZones = markZoneTricked(this.trickZones, zone.id);
     this.comboTicksRemaining = COMBO_TIMEOUT_TICKS;
@@ -504,7 +504,12 @@ export class GameSimulation {
 
     if (this.tide && !this.tideFrozen) {
       this.tide = tickTide(this.tide);
-      this.trickZones = refreshTrickZonesForTide(this.trickZones, this.tide, this.zoneWasSubmerged);
+      this.trickZones = refreshTrickZonesForTide(
+        this.trickZones,
+        this.tide,
+        this.zoneWasSubmerged,
+        (zone, allZones) => relocateTrickZoneOnReef(zone, this.arena.map, allZones),
+      );
     }
 
     if (this.comboTicksRemaining > 0) {

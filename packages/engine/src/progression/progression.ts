@@ -1,10 +1,20 @@
+import { TICK_MS } from '../constants/movement.js';
+import { comboXpMultiplier } from './combo.js';
 import type { ProgressionState, UnlockDefinition, UnlockId } from './types.js';
 import { UNLOCK_REGISTRY } from './types.js';
 
+export * from './combo.js';
+
 export const TRICK_XP_AGILITY = 45;
 export const TRICK_XP_SAILING = 35;
-export const TRICK_TOKEN_BASE = 10;
-export const COMBO_TIMEOUT_TICKS = 8;
+
+export const CORAL_TOKEN_DROP_CHANCE = 1 / 10;
+export const CORAL_TOKEN_MIN = 6;
+export const CORAL_TOKEN_MAX = 10;
+
+/** Combo grace period after landing a trick — only bails reset it sooner. */
+export const COMBO_TIMEOUT_MS = 30_000;
+export const COMBO_TIMEOUT_TICKS = Math.ceil(COMBO_TIMEOUT_MS / TICK_MS);
 
 export function createProgressionState(): ProgressionState {
   return {
@@ -75,13 +85,27 @@ export interface TrickResult {
   tokensGained: number;
 }
 
-export function awardTrick(state: ProgressionState, comboMultiplier = 1): TrickResult {
+export function rollCoralTokenDrop(random: () => number = Math.random): number {
+  const roll = random();
+  if (roll >= CORAL_TOKEN_DROP_CHANCE) {
+    return 0;
+  }
+  const span = CORAL_TOKEN_MAX - CORAL_TOKEN_MIN + 1;
+  const amountIndex = Math.floor((roll / CORAL_TOKEN_DROP_CHANCE) * span);
+  return CORAL_TOKEN_MIN + Math.min(span - 1, amountIndex);
+}
+
+export function awardTrick(
+  state: ProgressionState,
+  random: () => number = Math.random,
+): TrickResult {
   const combo = state.session.combo + 1;
+  const xpMultiplier = comboXpMultiplier(combo);
   const xpGained = {
-    agility: TRICK_XP_AGILITY * comboMultiplier,
-    sailing: TRICK_XP_SAILING * comboMultiplier,
+    agility: TRICK_XP_AGILITY * xpMultiplier,
+    sailing: TRICK_XP_SAILING * xpMultiplier,
   };
-  const tokensGained = TRICK_TOKEN_BASE * comboMultiplier;
+  const tokensGained = rollCoralTokenDrop(random);
 
   const next: ProgressionState = {
     ...state,

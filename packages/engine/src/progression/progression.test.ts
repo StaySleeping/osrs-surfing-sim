@@ -1,22 +1,66 @@
 import { describe, expect, it } from 'vitest';
 
+import { comboTierName, comboTierProgress, comboXpMultiplier } from './combo.js';
 import {
   awardTrick,
   canPurchaseUnlock,
   createProgressionState,
   purchaseUnlock,
+  rollCoralTokenDrop,
 } from './progression.js';
 import { UNLOCK_REGISTRY } from './types.js';
 
 describe('progression', () => {
-  it('awards xp and tokens with combo multiplier', () => {
+  it('awards base xp until combo reaches 10, then scales at each decade', () => {
     let state = createProgressionState();
-    const first = awardTrick(state, 1);
-    state = first.state;
-    const second = awardTrick(state, 2);
 
-    expect(second.xpGained.agility).toBeGreaterThan(first.xpGained.agility);
-    expect(second.state.session.combo).toBe(2);
+    for (let i = 1; i <= 9; i += 1) {
+      const result = awardTrick(state, () => 1);
+      state = result.state;
+      expect(result.xpGained.agility).toBe(45);
+      expect(result.xpGained.sailing).toBe(35);
+      expect(result.state.session.combo).toBe(i);
+    }
+
+    const atTen = awardTrick(state, () => 1);
+    expect(atTen.xpGained.agility).toBe(90);
+    expect(atTen.xpGained.sailing).toBe(70);
+    expect(atTen.state.session.combo).toBe(10);
+  });
+
+  it('caps xp multiplier at dragon tier', () => {
+    let state = createProgressionState();
+    for (let i = 0; i < 69; i += 1) {
+      state = awardTrick(state, () => 1).state;
+    }
+    const dragon = awardTrick(state, () => 1);
+    expect(dragon.state.session.combo).toBe(70);
+    expect(comboXpMultiplier(70)).toBe(7);
+    expect(dragon.xpGained.agility).toBe(45 * 7);
+    expect(comboTierName(70)).toBe('Dragon');
+  });
+
+  it('awards coral tokens on a 1/10 roll only', () => {
+    const state = createProgressionState();
+    const miss = awardTrick(state, () => 0.5);
+    expect(miss.tokensGained).toBe(0);
+
+    const hit = awardTrick(state, () => 0);
+    expect(hit.tokensGained).toBeGreaterThanOrEqual(6);
+    expect(hit.tokensGained).toBeLessThanOrEqual(10);
+  });
+
+  it('rolls coral tokens in the 6–10 range when drop succeeds', () => {
+    expect(rollCoralTokenDrop(() => 0)).toBe(6);
+    expect(rollCoralTokenDrop(() => 0.09)).toBe(10);
+    expect(rollCoralTokenDrop(() => 0.1)).toBe(0);
+  });
+
+  it('tracks combo tier progress within each decade', () => {
+    expect(comboTierProgress(5)).toBe(5);
+    expect(comboTierProgress(10)).toBe(10);
+    expect(comboTierProgress(23)).toBe(3);
+    expect(comboTierName(23)).toBe('Steel');
   });
 
   it('purchases unlock when requirements met', () => {

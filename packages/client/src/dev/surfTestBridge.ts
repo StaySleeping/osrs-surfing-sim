@@ -9,6 +9,9 @@ export interface SurfTestControls {
   pause: () => void;
   resume: () => void;
   renderFrame: () => void;
+  getDisplayPosition?: () => { x: number; y: number };
+  getTickBlend?: () => number;
+  onSimulationTick?: (before: SimulationSnapshot, after: SimulationSnapshot) => void;
   afterTick?: () => void;
 }
 
@@ -26,6 +29,8 @@ export interface SurfTestApi {
   setTideFrozen: (frozen: boolean) => void;
   setMovementFrozen: (frozen: boolean) => void;
   renderFrame: () => void;
+  getDisplayPosition: () => { x: number; y: number };
+  getTickBlend: () => number;
 }
 
 declare global {
@@ -49,7 +54,10 @@ export function installSurfTestBridge(
     clearTrickPrepare: () => simulation.clearTrickPrepare(),
     advanceTicks: (count = 1) => {
       for (let i = 0; i < count; i += 1) {
+        const before = simulation.getSnapshot();
         simulation.tick();
+        const after = simulation.getSnapshot();
+        controls.onSimulationTick?.(before, after);
         controls.afterTick?.();
       }
     },
@@ -61,5 +69,8 @@ export function installSurfTestBridge(
     setTideFrozen: (frozen) => simulation.setTideFrozen(frozen),
     setMovementFrozen: (frozen) => simulation.setMovementFrozen(frozen),
     renderFrame: controls.renderFrame,
+    getDisplayPosition: () =>
+      controls.getDisplayPosition?.() ?? simulation.getSnapshot().surfboard.position,
+    getTickBlend: () => controls.getTickBlend?.() ?? 0,
   };
 }
