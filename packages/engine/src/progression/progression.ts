@@ -1,4 +1,3 @@
-import { TICK_MS } from '../constants/movement.js';
 import { comboXpMultiplier } from './combo.js';
 import type { ProgressionState, UnlockDefinition, UnlockId } from './types.js';
 import { UNLOCK_REGISTRY } from './types.js';
@@ -12,9 +11,14 @@ export const CORAL_TOKEN_DROP_CHANCE = 1 / 10;
 export const CORAL_TOKEN_MIN = 6;
 export const CORAL_TOKEN_MAX = 10;
 
-/** Combo grace period after landing a trick — only bails reset it sooner. */
-export const COMBO_TIMEOUT_MS = 30_000;
-export const COMBO_TIMEOUT_TICKS = Math.ceil(COMBO_TIMEOUT_MS / TICK_MS);
+export interface SerializedProgressionState {
+  xp: ProgressionState['xp'];
+  coralTokens: number;
+  unlocked: UnlockId[];
+  session: ProgressionState['session'];
+}
+
+const VALID_UNLOCK_IDS = new Set<UnlockId>(UNLOCK_REGISTRY.map((entry) => entry.id));
 
 export function createProgressionState(): ProgressionState {
   return {
@@ -22,6 +26,70 @@ export function createProgressionState(): ProgressionState {
     coralTokens: 0,
     unlocked: new Set(),
     session: { tricksLanded: 0, combo: 0, maxCombo: 0 },
+  };
+}
+
+export function cloneProgressionState(state: ProgressionState): ProgressionState {
+  return {
+    xp: { ...state.xp },
+    coralTokens: state.coralTokens,
+    unlocked: new Set(state.unlocked),
+    session: { ...state.session },
+  };
+}
+
+export function serializeProgressionState(state: ProgressionState): SerializedProgressionState {
+  return {
+    xp: { ...state.xp },
+    coralTokens: state.coralTokens,
+    unlocked: [...state.unlocked],
+    session: { ...state.session },
+  };
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+export function deserializeProgressionState(data: unknown): ProgressionState | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  const record = data as Partial<SerializedProgressionState>;
+  if (
+    !record.xp ||
+    typeof record.xp !== 'object' ||
+    !isNonNegativeNumber(record.xp.agility) ||
+    !isNonNegativeNumber(record.xp.sailing) ||
+    !isNonNegativeNumber(record.coralTokens) ||
+    !record.session ||
+    typeof record.session !== 'object' ||
+    !isNonNegativeNumber(record.session.tricksLanded) ||
+    !isNonNegativeNumber(record.session.combo) ||
+    !isNonNegativeNumber(record.session.maxCombo) ||
+    !Array.isArray(record.unlocked)
+  ) {
+    return null;
+  }
+
+  const unlocked: UnlockId[] = [];
+  for (const id of record.unlocked) {
+    if (typeof id !== 'string' || !VALID_UNLOCK_IDS.has(id as UnlockId)) {
+      return null;
+    }
+    unlocked.push(id as UnlockId);
+  }
+
+  return {
+    xp: { agility: record.xp.agility, sailing: record.xp.sailing },
+    coralTokens: record.coralTokens,
+    unlocked: new Set(unlocked),
+    session: {
+      tricksLanded: record.session.tricksLanded,
+      combo: record.session.combo,
+      maxCombo: record.session.maxCombo,
+    },
   };
 }
 

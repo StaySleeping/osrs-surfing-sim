@@ -2,6 +2,7 @@ import {
   createCoralParkSlice,
   DEFAULT_SURFBOARD_STATS,
   GameSimulation,
+  type ProgressionState,
   type TrickPrepareSlot,
 } from '@osrs-surfing/engine';
 
@@ -12,6 +13,7 @@ const TRICK_KEY_SLOTS: Partial<Record<string, TrickPrepareSlot>> = {
 };
 
 import { installSurfTestBridge } from './dev/surfTestBridge.js';
+import { loadSavedProgression, saveProgression } from './progressionStorage.js';
 import { ThreeRenderer } from './render/ThreeRenderer.js';
 import { SurfboardMotionInterpolator } from './render/visualSnapshot.js';
 import { DebugPanel } from './ui/DebugPanel.js';
@@ -46,6 +48,7 @@ export class OsrsClient {
   private paused = false;
   private lastDisplayPosition = { x: 0, y: 0 };
   private lastTickBlend = 0;
+  private lastSavedProgressionFingerprint = '';
 
   private constructor(
     simulation: GameSimulation,
@@ -73,7 +76,11 @@ export class OsrsClient {
       window.addEventListener('resize', () => applyIntegerScale(scaleShell, scaleWrap));
     }
 
-    const simulation = new GameSimulation({ arena: createCoralParkSlice() });
+    const savedProgression = loadSavedProgression();
+    const simulation = new GameSimulation({
+      arena: createCoralParkSlice(),
+      initialProgression: savedProgression ?? undefined,
+    });
 
     const gameRoot = document.getElementById('game-root');
     const sidePanelRoot = document.getElementById('side-panel');
@@ -130,6 +137,7 @@ export class OsrsClient {
         chatbox.push(error, 'system');
       }
       const snapshot = simulation.getSnapshot();
+      saveProgression(snapshot.progression);
       shopPanel.update(snapshot.progression);
       sidePanel.update(snapshot);
     });
@@ -162,6 +170,9 @@ export class OsrsClient {
     );
 
     const spawnSnapshot = simulation.getSnapshot();
+    if (savedProgression) {
+      client.seedProgressionFingerprint(spawnSnapshot.progression);
+    }
     client.motion.reset(spawnSnapshot);
     client.tidePhaseFrom = spawnSnapshot.tide?.phaseRadians ?? null;
     client.wireViewport();
@@ -245,6 +256,7 @@ export class OsrsClient {
     this.renderer.syncMapAfterTick(snapshot, map);
     this.sidePanel.update(snapshot);
     this.shopPanel.update(snapshot.progression);
+    this.persistProgressionIfChanged(snapshot.progression);
     this.debugPanel.update(snapshot);
     this.minimap.update(snapshot, map);
 
@@ -318,7 +330,32 @@ export class OsrsClient {
     return this.lastTickBlend;
   }
 
+  seedProgressionFingerprint(progression: ProgressionState): void {
+    this.lastSavedProgressionFingerprint = this.progressionFingerprint(progression);
+  }
+
+  private progressionFingerprint(progression: ProgressionState): string {
+    return JSON.stringify({
+      xp: progression.xp,
+      coralTokens: progression.coralTokens,
+      unlocked: [...progression.unlocked].sort(),
+      combo: progression.session.combo,
+      maxCombo: progression.session.maxCombo,
+      tricksLanded: progression.session.tricksLanded,
+    });
+  }
+
+  private persistProgressionIfChanged(progression: ProgressionState): void {
+    const fingerprint = this.progressionFingerprint(progression);
+    if (fingerprint === this.lastSavedProgressionFingerprint) {
+      return;
+    }
+    this.lastSavedProgressionFingerprint = fingerprint;
+    saveProgression(progression);
+  }
+
   destroy(): void {
+    this.persistProgressionIfChanged(this.simulation.getSnapshot().progression);
     if (this.visualFrameId !== null) {
       cancelAnimationFrame(this.visualFrameId);
     }
