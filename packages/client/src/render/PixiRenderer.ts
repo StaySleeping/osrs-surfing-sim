@@ -5,6 +5,7 @@ import {
   headingToDegrees,
   isTrickZoneSubmerged,
   normalizeAngle,
+  trickZoneVisualAlpha,
   type SimulationSnapshot,
   type WorldMap,
 } from '@osrs-surfing/engine';
@@ -281,13 +282,18 @@ export class PixiRenderer implements IRenderer {
     const tide = snapshot.tide;
 
     for (const zone of snapshot.trickZones) {
-      if (tide && isTrickZoneSubmerged(zone, tide)) {
-        continue;
-      }
-
+      const interactionDisabled = tide ? isTrickZoneSubmerged(zone, tide) : false;
       const center = this.worldToScreen(zone.center.x, zone.center.y);
       const r = zone.radius * this.tileSizePx;
-      drawTrickFeature(this.trickGraphics!, center.x, center.y, r, zone);
+      drawTrickFeature(
+        this.trickGraphics!,
+        center.x,
+        center.y,
+        r,
+        zone,
+        interactionDisabled,
+        trickZoneVisualAlpha(zone),
+      );
     }
   }
 
