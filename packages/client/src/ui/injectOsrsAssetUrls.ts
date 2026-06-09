@@ -11,6 +11,8 @@ const OSRS_CSS_BACKGROUNDS: Record<string, string> = {
   '--osrs-url-tabs-top': 'fixed_mode/tabs_top_row.png',
   '--osrs-url-tabs-bottom': 'fixed_mode/tabs_row_bottom.png',
   '--osrs-url-side-panel': 'fixed_mode/side_panel_background.png',
+  '--osrs-url-side-panel-edge-left': 'side_panel_edge_left.png',
+  '--osrs-url-side-panel-edge-right': 'side_panel_edge_right.png',
 };
 
 export function injectOsrsAssetUrls(): void {

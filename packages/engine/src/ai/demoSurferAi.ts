@@ -17,8 +17,28 @@ import {
   type TrickPrepareState,
   type TrickZone,
 } from '../world/features.js';
+const TAU = Math.PI * 2;
+
 /** Mid-reef radial depth for staying on the rideable ring. */
 export const DEMO_SURFER_RING_DEPTH = 0.55;
+
+/** Tighter inside line when the white wash is closing in. */
+export const DEMO_SURFER_INNER_RING_DEPTH = 0.28;
+
+/** Past this fraction of the dry arc, Nalu prioritises nearby tricks. */
+export const DEMO_SURFER_DRY_ZONE_FRONT_HALF = 0.5;
+
+/** Homing range when in the front half of the dry reef. */
+export const DEMO_SURFER_FRONT_HALF_HOMING_DISTANCE = 32;
+
+/** Clockwise scan range for tricks when hunting in the front half. */
+export const DEMO_SURFER_FRONT_HALF_ZONE_LOOKAHEAD_FRACTION = 0.85;
+
+/** Prefer any exposed trick within this tile radius in the front half. */
+export const DEMO_SURFER_NEARBY_TRICK_TILES = 26;
+
+/** Allow slightly-behind features when this close (radians clockwise). */
+export const DEMO_SURFER_NEARBY_TRICK_BEHIND_RADIANS = 0.12;
 
 /** Slow down when this far ahead of the dry-reef trailing edge (fraction of sweep). */
 export const DEMO_SURFER_SLOW_AHEAD_FRACTION = 0.28;
@@ -82,28 +102,69 @@ export function reefRideClockwiseRadians(angle: number): number {
   return angle + Math.PI / 2;
 }
 
-function idealReefPoint(angle: number): { x: number; y: number } {
+function dryArcRadians(tide: TideState): number {
+  return TAU - tide.sweepRadians;
+}
+
+/** True when Nalu is in the front half of the dry reef (closer to the approaching swell). */
+export function isDryZoneFrontHalf(angle: number, tide: TideState): boolean {
+  const { fromTrailing } = dryZoneMargins(angle, tide);
+  return fromTrailing > dryArcRadians(tide) * DEMO_SURFER_DRY_ZONE_FRONT_HALF;
+}
+
+export function targetRingDepth(angle: number, tide: TideState): number {
+  const toLeading = effectiveToLeading(angle, tide);
+  const cautionThreshold =
+    tide.sweepRadians * DEMO_SURFER_CAUTION_LEADING_FRACTION + tideLeadingBuffer(tide);
+  const spinThreshold =
+    tide.sweepRadians * DEMO_SURFER_SPIN_LEADING_FRACTION + tideLeadingBuffer(tide);
+
+  if (toLeading >= cautionThreshold) {
+    return DEMO_SURFER_RING_DEPTH;
+  }
+
+  const pressure =
+    1 - (toLeading - spinThreshold) / Math.max(cautionThreshold - spinThreshold, 0.01);
+  const clampedPressure = Math.min(1, Math.max(0, pressure));
+  return (
+    DEMO_SURFER_RING_DEPTH +
+    (DEMO_SURFER_INNER_RING_DEPTH - DEMO_SURFER_RING_DEPTH) * clampedPressure
+  );
+}
+
+function reefPointAtDepth(angle: number, depth: number): { x: number; y: number } {
   const inner = coralParkReefInnerRadius(angle);
   const outer = coralParkReefOuterRadius(angle);
-  const radius = inner + (outer - inner) * DEMO_SURFER_RING_DEPTH;
+  const radius = inner + (outer - inner) * depth;
   return {
     x: CORAL_PARK_ISLAND_CX + Math.cos(angle) * radius,
     y: CORAL_PARK_ISLAND_CY + Math.sin(angle) * radius,
   };
 }
 
+function idealReefPoint(angle: number, tide: TideState | null = null): { x: number; y: number } {
+  const depth = tide ? targetRingDepth(angle, tide) : DEMO_SURFER_RING_DEPTH;
+  return reefPointAtDepth(angle, depth);
+}
+
 function courseHeading(
   position: { x: number; y: number },
   steerX: number,
   steerY: number,
+  tide: TideState | null,
 ): HeadingIndex {
   const { angle, radius } = polarFromIsland(position.x, position.y);
-  const ideal = idealReefPoint(angle);
+  const ideal = idealReefPoint(angle, tide);
+  const idealRadius = Math.hypot(ideal.x - CORAL_PARK_ISLAND_CX, ideal.y - CORAL_PARK_ISLAND_CY);
   const tangent = reefRideClockwiseRadians(angle);
 
-  const radialError =
-    radius - Math.hypot(ideal.x - CORAL_PARK_ISLAND_CX, ideal.y - CORAL_PARK_ISLAND_CY);
-  const radialCorrection = Math.max(-0.35, Math.min(0.35, radialError * 0.08));
+  const washClose =
+    tide !== null &&
+    effectiveToLeading(angle, tide) <
+      tide.sweepRadians * DEMO_SURFER_CAUTION_LEADING_FRACTION + tideLeadingBuffer(tide);
+  const radialGain = washClose ? 0.2 : 0.08;
+  const radialError = radius - idealRadius;
+  const radialCorrection = Math.max(-0.45, Math.min(0.45, radialError * radialGain));
 
   const blendX =
     Math.cos(tangent) * 0.82 + Math.cos(angle) * radialCorrection + (steerX - position.x) * 0.06;
@@ -192,7 +253,7 @@ function pathAheadEntersHighTide(
 function chooseSpeedState(
   position: { x: number; y: number },
   tide: TideState | null,
-  approachingZone: TrickZone | null,
+  pursuingTrick: boolean,
 ): SurfboardInput {
   if (!tide) {
     return { standUp: true };
@@ -208,12 +269,12 @@ function chooseSpeedState(
     return { lieDown: true };
   }
 
-  if (toLeading < cautionThreshold) {
-    return { lieDown: true };
+  if (pursuingTrick) {
+    return { standUp: true };
   }
 
-  if (approachingZone) {
-    return { standUp: true };
+  if (toLeading < cautionThreshold) {
+    return { lieDown: true };
   }
 
   if (fromTrailing > slowAheadThreshold) {
@@ -223,7 +284,7 @@ function chooseSpeedState(
   return { standUp: true };
 }
 
-function nextExposedZone(
+function selectTrickZone(
   position: { x: number; y: number },
   trickZones: TrickZone[],
   tide: TideState | null,
@@ -233,9 +294,20 @@ function nextExposedZone(
   }
 
   const riderAngle = polarFromIsland(position.x, position.y).angle;
-  const lookahead = tide.sweepRadians * DEMO_SURFER_ZONE_LOOKAHEAD_FRACTION;
-  let best: TrickZone | null = null;
-  let bestAhead = Infinity;
+  const frontHalf = isDryZoneFrontHalf(riderAngle, tide);
+  const lookahead =
+    tide.sweepRadians *
+    (frontHalf
+      ? DEMO_SURFER_FRONT_HALF_ZONE_LOOKAHEAD_FRACTION
+      : DEMO_SURFER_ZONE_LOOKAHEAD_FRACTION);
+  const nearbyRadius = frontHalf
+    ? DEMO_SURFER_NEARBY_TRICK_TILES
+    : DEMO_SURFER_ZONE_HOMING_DISTANCE;
+
+  let bestNearby: TrickZone | null = null;
+  let bestNearbyDist = Infinity;
+  let bestAhead: TrickZone | null = null;
+  let bestAheadScore = Infinity;
 
   for (const zone of trickZones) {
     if (zone.tricked) {
@@ -245,21 +317,33 @@ function nextExposedZone(
       continue;
     }
 
+    const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
     const zoneAngle = Math.atan2(zone.center.y - tide.centerY, zone.center.x - tide.centerX);
     const ahead = clockwiseAngleDelta(riderAngle, zoneAngle);
+
+    if (frontHalf && dist <= nearbyRadius) {
+      const reachable =
+        ahead <= DEMO_SURFER_NEARBY_TRICK_BEHIND_RADIANS || (ahead > 0.05 && ahead <= lookahead);
+      if (reachable && dist < bestNearbyDist) {
+        bestNearbyDist = dist;
+        bestNearby = zone;
+      }
+    }
+
     if (ahead <= 0.05 || ahead > lookahead) {
       continue;
     }
 
-    const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
-    const score = ahead + dist * 0.02;
-    if (score < bestAhead) {
-      bestAhead = score;
-      best = zone;
+    const aheadWeight = frontHalf ? 0.25 : 1;
+    const distWeight = frontHalf ? 0.06 : 0.02;
+    const score = ahead * aheadWeight + dist * distWeight;
+    if (score < bestAheadScore) {
+      bestAheadScore = score;
+      bestAhead = zone;
     }
   }
 
-  return best;
+  return bestNearby ?? bestAhead;
 }
 
 function steerTowardZone(
@@ -284,13 +368,18 @@ function shouldPrimeTrick(
   position: { x: number; y: number },
   zone: TrickZone,
   trickPrepare: TrickPrepareState | null,
+  inFrontHalf: boolean,
 ): TrickPrepareState['slot'] | undefined {
   if (trickPrepare) {
     return undefined;
   }
 
   const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
-  if (dist < DEMO_SURFER_ZONE_PRIME_DISTANCE && dist > zone.radius * 0.45) {
+  const primeDistance = inFrontHalf
+    ? DEMO_SURFER_ZONE_PRIME_DISTANCE + 4
+    : DEMO_SURFER_ZONE_PRIME_DISTANCE;
+  const minDist = zone.radius * (inFrontHalf ? 0.35 : 0.45);
+  if (dist < primeDistance && dist > minDist) {
     return zone.prepareSlot;
   }
 
@@ -309,38 +398,47 @@ export function computeDemoSurferAi(context: DemoSurferAiContext): DemoSurferAiI
     };
   }
 
-  const targetZone = nextExposedZone(position, trickZones, tide);
+  const riderAngle = polarFromIsland(position.x, position.y).angle;
+  const inFrontHalf = tide !== null && isDryZoneFrontHalf(riderAngle, tide);
+  const targetZone = selectTrickZone(position, trickZones, tide);
   let steerX = position.x;
   let steerY = position.y;
 
+  const homingDistance = inFrontHalf
+    ? DEMO_SURFER_FRONT_HALF_HOMING_DISTANCE
+    : DEMO_SURFER_ZONE_HOMING_DISTANCE;
+
   if (targetZone) {
     const dist = Math.hypot(position.x - targetZone.center.x, position.y - targetZone.center.y);
-    if (dist <= DEMO_SURFER_ZONE_HOMING_DISTANCE) {
+    if (dist <= homingDistance) {
       const steer = steerTowardZone(position, targetZone);
       steerX = steer.steerX;
       steerY = steer.steerY;
     } else {
-      const ideal = idealReefPoint(
-        polarFromIsland(position.x, position.y).angle + DEMO_SURFER_AHEAD_ANGLE_STEP * 0.65,
-      );
+      const ideal = idealReefPoint(riderAngle + DEMO_SURFER_AHEAD_ANGLE_STEP * 0.65, tide);
       steerX = ideal.x;
       steerY = ideal.y;
     }
   } else {
-    const aheadAngle = polarFromIsland(position.x, position.y).angle + DEMO_SURFER_AHEAD_ANGLE_STEP;
-    const ideal = idealReefPoint(aheadAngle);
+    const aheadAngle = riderAngle + DEMO_SURFER_AHEAD_ANGLE_STEP;
+    const ideal = idealReefPoint(aheadAngle, tide);
     steerX = ideal.x;
     steerY = ideal.y;
   }
 
-  const speed = chooseSpeedState(position, tide, targetZone);
+  const pursuingTrick =
+    targetZone !== null &&
+    Math.hypot(position.x - targetZone.center.x, position.y - targetZone.center.y) <=
+      homingDistance;
+
+  const speed = chooseSpeedState(position, tide, pursuingTrick);
   const input: DemoSurferAiInput = {
     ...speed,
-    setIntendedHeading: courseHeading(position, steerX, steerY),
+    setIntendedHeading: courseHeading(position, steerX, steerY, tide),
   };
 
   if (targetZone) {
-    const primeSlot = shouldPrimeTrick(position, targetZone, trickPrepare);
+    const primeSlot = shouldPrimeTrick(position, targetZone, trickPrepare, inFrontHalf);
     if (primeSlot !== undefined) {
       input.prepareSlot = primeSlot;
     }

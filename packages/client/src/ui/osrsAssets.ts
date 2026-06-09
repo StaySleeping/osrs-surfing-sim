@@ -6,6 +6,8 @@ export const OSRS_ASSETS = {
     windowTop: osrsAssetUrl('fixed_mode/window_frame_edge_top.png'),
     topRightCorner: osrsAssetUrl('fixed_mode/top_right_corner.png'),
     sidePanelBg: osrsAssetUrl('fixed_mode/side_panel_background.png'),
+    sidePanelEdgeLeft: osrsAssetUrl('side_panel_edge_left.png'),
+    sidePanelEdgeRight: osrsAssetUrl('side_panel_edge_right.png'),
     minimapFrame: osrsAssetUrl('fixed_mode/minimap_and_compass_frame.png'),
     minimapLeft: osrsAssetUrl('fixed_mode/minimap_left_edge.png'),
     minimapRight: osrsAssetUrl('fixed_mode/minimap_right_edge.png'),
