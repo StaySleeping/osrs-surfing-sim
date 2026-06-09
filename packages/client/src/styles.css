@@ -228,12 +228,32 @@ body,
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background:
-    var(--osrs-url-minimap-left) repeat-y left top,
-    var(--osrs-url-minimap-right) repeat-y right top;
-  background-size:
-    var(--osrs-minimap-left-edge) auto,
-    var(--osrs-minimap-right-edge) auto;
+}
+
+.osrs-interface-row {
+  display: flex;
+  width: var(--osrs-interface-row-width);
+  height: var(--osrs-interface-panel-height);
+  margin-left: var(--osrs-interface-row-left);
+  flex-shrink: 0;
+}
+
+.osrs-interface-edge {
+  width: var(--osrs-side-panel-edge-width);
+  height: var(--osrs-interface-panel-height);
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size: var(--osrs-side-panel-edge-width) var(--osrs-interface-panel-height);
+  image-rendering: pixelated;
+}
+
+.osrs-interface-edge-left {
+  background-image: var(--osrs-url-side-panel-edge-left);
+}
+
+.osrs-interface-edge-right {
+  background-image: var(--osrs-url-side-panel-edge-right);
 }
 
 .osrs-tab-strip {
@@ -298,7 +318,6 @@ body,
   position: relative;
   width: var(--osrs-side-panel-width);
   height: var(--osrs-interface-panel-height);
-  margin-left: var(--osrs-side-panel-left);
   flex-shrink: 0;
   background: var(--osrs-url-side-panel) no-repeat center top;
   background-size: var(--osrs-side-panel-width) var(--osrs-interface-panel-height);

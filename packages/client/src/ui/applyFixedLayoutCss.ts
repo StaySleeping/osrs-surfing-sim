@@ -21,8 +21,10 @@ import {
   MINIMAP_MAP_TOP,
   MINIMAP_RIGHT_EDGE_WIDTH,
   INTERFACE_PANEL_HEIGHT,
+  INTERFACE_ROW_LEFT,
+  INTERFACE_ROW_WIDTH,
+  SIDE_PANEL_EDGE_WIDTH,
   SIDE_PANEL_HEIGHT,
-  SIDE_PANEL_LEFT,
   SIDE_PANEL_WIDTH,
   SIDEBAR_BODY_HEIGHT,
   SIDEBAR_WIDTH,
@@ -71,9 +73,11 @@ export function applyFixedLayoutCss(): void {
     '--osrs-tab-bar-height': PX(TAB_BAR_HEIGHT),
     '--osrs-sidebar-body-height': PX(SIDEBAR_BODY_HEIGHT),
     '--osrs-interface-panel-height': PX(INTERFACE_PANEL_HEIGHT),
+    '--osrs-interface-row-width': PX(INTERFACE_ROW_WIDTH),
+    '--osrs-interface-row-left': PX(INTERFACE_ROW_LEFT),
+    '--osrs-side-panel-edge-width': PX(SIDE_PANEL_EDGE_WIDTH),
     '--osrs-side-panel-width': PX(SIDE_PANEL_WIDTH),
     '--osrs-side-panel-height': PX(SIDE_PANEL_HEIGHT),
-    '--osrs-side-panel-left': PX(SIDE_PANEL_LEFT),
   };
 
   for (const [name, value] of Object.entries(vars)) {
