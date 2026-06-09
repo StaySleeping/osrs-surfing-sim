@@ -30,20 +30,14 @@ export const DEMO_SURFER_INNER_RING_DEPTH = 0.28;
 /** Past this fraction of the dry arc, Nalu prioritises nearby tricks. */
 export const DEMO_SURFER_DRY_ZONE_FRONT_HALF = 0.5;
 
-/** Homing range when in the front half of the dry reef. */
-export const DEMO_SURFER_FRONT_HALF_HOMING_DISTANCE = 32;
+/** Slow down when this close to the dry-reef trailing edge (fraction of sweep). */
+export const DEMO_SURFER_TRAILING_EDGE_CAUTION_FRACTION = 0.22;
 
-/** Clockwise scan range for tricks when hunting in the front half. */
-export const DEMO_SURFER_FRONT_HALF_ZONE_LOOKAHEAD_FRACTION = 0.85;
+/** Skip trick targeting when this close to a tide edge (fraction of sweep). */
+export const DEMO_SURFER_TRICK_EDGE_CAUTION_FRACTION = 0.22;
 
-/** Prefer any exposed trick within this tile radius in the front half. */
-export const DEMO_SURFER_NEARBY_TRICK_TILES = 26;
-
-/** Allow slightly-behind features when this close (radians clockwise). */
-export const DEMO_SURFER_NEARBY_TRICK_BEHIND_RADIANS = 0.12;
-
-/** Slow down when this far ahead of the dry-reef trailing edge (fraction of sweep). */
-export const DEMO_SURFER_SLOW_AHEAD_FRACTION = 0.28;
+/** Allow a trick just behind the rider when selecting the closest feature. */
+export const DEMO_SURFER_TRICK_BEHIND_RADIANS = 0.12;
 
 /** Start paddling when within this fraction of the sweep from the high-tide leading edge. */
 export const DEMO_SURFER_CAUTION_LEADING_FRACTION = 0.4;
@@ -65,12 +59,6 @@ export const DEMO_SURFER_TIDE_LOOKAHEAD_TICKS = 4;
 
 /** Reef lookahead steps when checking whether ride speed would enter high tide. */
 export const DEMO_SURFER_PATH_LOOKAHEAD_STEPS = 2;
-
-/** How far clockwise to scan for the next trick feature (fraction of sweep). */
-export const DEMO_SURFER_ZONE_LOOKAHEAD_FRACTION = 0.55;
-
-/** Start homing toward a feature within this many tiles. */
-export const DEMO_SURFER_ZONE_HOMING_DISTANCE = 18;
 
 /** Prime a trick when within this many tiles of the feature centre. */
 export const DEMO_SURFER_ZONE_PRIME_DISTANCE = 12;
@@ -112,6 +100,23 @@ function dryArcRadians(tide: TideState): number {
 export function isDryZoneFrontHalf(angle: number, tide: TideState): boolean {
   const { fromTrailing } = dryZoneMargins(angle, tide);
   return fromTrailing > dryArcRadians(tide) * DEMO_SURFER_DRY_ZONE_FRONT_HALF;
+}
+
+/** True when Nalu should slow down for tide safety at the dry-reef edges. */
+export function isNearTideEdge(angle: number, tide: TideState): boolean {
+  const { fromTrailing, toLeading } = dryZoneMargins(angle, tide);
+  const trailingCaution = tide.sweepRadians * DEMO_SURFER_TRAILING_EDGE_CAUTION_FRACTION;
+  const leadingCaution =
+    tide.sweepRadians * DEMO_SURFER_CAUTION_LEADING_FRACTION + tideLeadingBuffer(tide);
+  return fromTrailing < trailingCaution || toLeading < leadingCaution;
+}
+
+function isNearTideEdgeForTricks(angle: number, tide: TideState): boolean {
+  const { fromTrailing, toLeading } = dryZoneMargins(angle, tide);
+  const trailingCaution = tide.sweepRadians * DEMO_SURFER_TRICK_EDGE_CAUTION_FRACTION;
+  const leadingCaution =
+    tide.sweepRadians * DEMO_SURFER_TRICK_EDGE_CAUTION_FRACTION + tideLeadingBuffer(tide);
+  return fromTrailing < trailingCaution || toLeading < leadingCaution;
 }
 
 export function targetRingDepth(angle: number, tide: TideState): number {
@@ -263,10 +268,6 @@ function chooseSpeedState(
 
   const { angle } = polarFromIsland(position.x, position.y);
   const submerged = isPointInTideSweep(position.x, position.y, tide);
-  const { fromTrailing, toLeading } = dryZoneMargins(angle, tide);
-  const slowAheadThreshold = tide.sweepRadians * DEMO_SURFER_SLOW_AHEAD_FRACTION;
-  const cautionThreshold =
-    tide.sweepRadians * DEMO_SURFER_CAUTION_LEADING_FRACTION + tideLeadingBuffer(tide);
   if (submerged) {
     return { lieDown: true };
   }
@@ -275,11 +276,7 @@ function chooseSpeedState(
     return { standUp: true };
   }
 
-  if (toLeading < cautionThreshold) {
-    return { lieDown: true };
-  }
-
-  if (fromTrailing > slowAheadThreshold) {
+  if (isNearTideEdge(angle, tide)) {
     return { lieDown: true };
   }
 
@@ -296,20 +293,11 @@ function selectTrickZone(
   }
 
   const riderAngle = polarFromIsland(position.x, position.y).angle;
-  const frontHalf = isDryZoneFrontHalf(riderAngle, tide);
-  const lookahead =
-    tide.sweepRadians *
-    (frontHalf
-      ? DEMO_SURFER_FRONT_HALF_ZONE_LOOKAHEAD_FRACTION
-      : DEMO_SURFER_ZONE_LOOKAHEAD_FRACTION);
-  const nearbyRadius = frontHalf
-    ? DEMO_SURFER_NEARBY_TRICK_TILES
-    : DEMO_SURFER_ZONE_HOMING_DISTANCE;
+  const nearEdge = isNearTideEdgeForTricks(riderAngle, tide);
 
-  let bestNearby: TrickZone | null = null;
-  let bestNearbyDist = Infinity;
-  let bestAhead: TrickZone | null = null;
-  let bestAheadScore = Infinity;
+  const dryArc = dryArcRadians(tide);
+  let best: TrickZone | null = null;
+  let bestDist = Infinity;
 
   for (const zone of trickZones) {
     if (zone.tricked) {
@@ -319,33 +307,26 @@ function selectTrickZone(
       continue;
     }
 
-    const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
     const zoneAngle = Math.atan2(zone.center.y - tide.centerY, zone.center.x - tide.centerX);
     const ahead = clockwiseAngleDelta(riderAngle, zoneAngle);
-
-    if (frontHalf && dist <= nearbyRadius) {
-      const reachable =
-        ahead <= DEMO_SURFER_NEARBY_TRICK_BEHIND_RADIANS || (ahead > 0.05 && ahead <= lookahead);
-      if (reachable && dist < bestNearbyDist) {
-        bestNearbyDist = dist;
-        bestNearby = zone;
-      }
-    }
-
-    if (ahead <= 0.05 || ahead > lookahead) {
+    const justBehind =
+      clockwiseAngleDelta(zoneAngle, riderAngle) <= DEMO_SURFER_TRICK_BEHIND_RADIANS;
+    if (!justBehind && ahead > dryArc) {
       continue;
     }
 
-    const aheadWeight = frontHalf ? 0.25 : 1;
-    const distWeight = frontHalf ? 0.06 : 0.02;
-    const score = ahead * aheadWeight + dist * distWeight;
-    if (score < bestAheadScore) {
-      bestAheadScore = score;
-      bestAhead = zone;
+    const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = zone;
     }
   }
 
-  return bestNearby ?? bestAhead;
+  if (nearEdge && best !== null && bestDist > DEMO_SURFER_ZONE_PRIME_DISTANCE + 4) {
+    return null;
+  }
+
+  return best;
 }
 
 function steerTowardZone(
@@ -406,21 +387,10 @@ export function computeDemoSurferAi(context: DemoSurferAiContext): DemoSurferAiI
   let steerX = position.x;
   let steerY = position.y;
 
-  const homingDistance = inFrontHalf
-    ? DEMO_SURFER_FRONT_HALF_HOMING_DISTANCE
-    : DEMO_SURFER_ZONE_HOMING_DISTANCE;
-
   if (targetZone) {
-    const dist = Math.hypot(position.x - targetZone.center.x, position.y - targetZone.center.y);
-    if (dist <= homingDistance) {
-      const steer = steerTowardZone(position, targetZone);
-      steerX = steer.steerX;
-      steerY = steer.steerY;
-    } else {
-      const ideal = idealReefPoint(riderAngle + DEMO_SURFER_AHEAD_ANGLE_STEP * 0.65, tide);
-      steerX = ideal.x;
-      steerY = ideal.y;
-    }
+    const steer = steerTowardZone(position, targetZone);
+    steerX = steer.steerX;
+    steerY = steer.steerY;
   } else {
     const aheadAngle = riderAngle + DEMO_SURFER_AHEAD_ANGLE_STEP;
     const ideal = idealReefPoint(aheadAngle, tide);
@@ -428,10 +398,7 @@ export function computeDemoSurferAi(context: DemoSurferAiContext): DemoSurferAiI
     steerY = ideal.y;
   }
 
-  const pursuingTrick =
-    targetZone !== null &&
-    Math.hypot(position.x - targetZone.center.x, position.y - targetZone.center.y) <=
-      homingDistance;
+  const pursuingTrick = targetZone !== null;
 
   const speed = chooseSpeedState(position, tide, pursuingTrick);
   const input: DemoSurferAiInput = {

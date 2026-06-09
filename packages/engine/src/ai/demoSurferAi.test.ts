@@ -41,7 +41,7 @@ describe('demoSurferAi', () => {
     );
   });
 
-  it('paddles when submerged and slows near the approaching high-tide front', () => {
+  it('paddles when submerged or near tide edges and rides through the dry reef middle', () => {
     const arena = createCoralParkSlice();
     const tide = createTideState(arena.tide!);
     const spawn = demoSurferSpawnOnReef(0);
@@ -69,7 +69,7 @@ describe('demoSurferAi', () => {
       y: CORAL_PARK_ISLAND_CY + Math.sin(dryAngle) * radius,
     };
 
-    const slowAi = computeDemoSurferAi({
+    const midDryAi = computeDemoSurferAi({
       surfboard: {
         ...createSurfboard(ahead.x, ahead.y, spawn.heading),
         speedState: 'riding',
@@ -79,7 +79,7 @@ describe('demoSurferAi', () => {
       tide,
       map: arena.map,
     });
-    expect(slowAi.lieDown).toBe(true);
+    expect(midDryAi.standUp).toBe(true);
     expect(isPointInTideSweep(ahead.x, ahead.y, tide)).toBe(false);
 
     const nearLeadingAngle =
