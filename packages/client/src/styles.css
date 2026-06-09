@@ -29,23 +29,26 @@ body,
 }
 
 .osrs-scale-wrap {
-  width: 765px;
-  height: 503px;
+  width: var(--osrs-frame-width);
+  height: var(--osrs-frame-height);
 }
 
 /* ── Fixed classic frame (765×503) ── */
 .osrs-client {
   position: relative;
-  width: 765px;
-  height: 503px;
+  display: flex;
+  flex-direction: column;
+  width: var(--osrs-frame-width);
+  height: var(--osrs-frame-height);
   background: #000;
   flex-shrink: 0;
 }
 
 .osrs-window-top {
-  height: 4px;
+  flex-shrink: 0;
+  height: var(--osrs-window-top-height);
   background: var(--osrs-url-window-top) repeat-x;
-  background-size: auto 4px;
+  background-size: auto var(--osrs-window-top-height);
 }
 
 .osrs-top-right-corner {
@@ -62,56 +65,53 @@ body,
 
 .osrs-client-grid {
   display: grid;
-  grid-template-columns: 512px 253px;
-  grid-template-rows: 334px 169px;
-  width: 765px;
-  height: 499px;
+  grid-template-columns: var(--osrs-viewport-width) var(--osrs-sidebar-width);
+  grid-template-rows: var(--osrs-viewport-height) var(--osrs-chat-height);
+  width: var(--osrs-frame-width);
+  height: var(--osrs-grid-height);
+  flex-shrink: 0;
 }
 
 .osrs-viewport-wrap {
   grid-column: 1;
   grid-row: 1;
-  width: 512px;
-  height: 334px;
+  width: var(--osrs-viewport-width);
+  height: var(--osrs-viewport-height);
   overflow: hidden;
   background: #000;
-  border-right: 1px solid #2e281d;
-  border-bottom: 1px solid #2e281d;
 }
 
 #game-root {
-  width: 512px;
-  height: 334px;
+  width: var(--osrs-viewport-width);
+  height: var(--osrs-viewport-height);
 }
 
 #game-root canvas {
   display: block;
-  width: 512px !important;
-  height: 334px !important;
+  width: var(--osrs-viewport-width) !important;
+  height: var(--osrs-viewport-height) !important;
 }
 
 /* ── Chatbox (bottom-left) ── */
 .osrs-chatbox {
   grid-column: 1;
   grid-row: 2;
-  width: 512px;
-  height: 169px;
+  width: var(--osrs-viewport-width);
+  height: var(--osrs-chat-height);
   display: flex;
   flex-direction: column;
   background: var(--osrs-url-chatbox-bg) no-repeat;
-  background-size: 512px 142px;
+  background-size: var(--osrs-viewport-width) var(--osrs-chat-messages-height);
   background-position: top left;
-  border-right: 1px solid #2e281d;
 }
 
 .osrs-chatbox-messages {
-  flex: 1;
+  height: var(--osrs-chat-messages-height);
   padding: 4px 8px;
   overflow-y: auto;
   font-size: 12px;
   line-height: 1.35;
   color: #ffff00;
-  max-height: 142px;
 }
 
 .osrs-chatbox-messages .chat-xp {
@@ -124,13 +124,13 @@ body,
 
 .osrs-chatbox-stones {
   position: relative;
-  height: 27px;
+  height: var(--osrs-chat-stones-height);
   flex-shrink: 0;
 }
 
 .osrs-chatbox-stones-bg {
-  width: 512px;
-  height: 23px;
+  width: var(--osrs-viewport-width);
+  height: var(--osrs-chat-stones-height);
   display: block;
 }
 
@@ -138,8 +138,8 @@ body,
 .osrs-sidebar {
   grid-column: 2;
   grid-row: 1 / 3;
-  width: 253px;
-  height: 503px;
+  width: var(--osrs-sidebar-width);
+  height: var(--osrs-grid-height);
   display: flex;
   flex-direction: column;
   background: #000;
@@ -147,23 +147,23 @@ body,
 
 .osrs-minimap {
   position: relative;
-  width: 253px;
-  height: 164px;
+  width: var(--osrs-sidebar-width);
+  height: var(--osrs-minimap-height);
   flex-shrink: 0;
   background:
     var(--osrs-url-minimap-left) no-repeat left top,
     var(--osrs-url-minimap-right) no-repeat right top;
   background-size:
-    29px 156px,
-    48px 156px;
+    var(--osrs-minimap-left-edge) var(--osrs-minimap-frame-height),
+    var(--osrs-minimap-right-edge) var(--osrs-minimap-frame-height);
 }
 
 .osrs-minimap-map {
   position: absolute;
-  left: 54px;
-  top: 8px;
-  width: 146px;
-  height: 146px;
+  left: var(--osrs-minimap-map-left);
+  top: var(--osrs-minimap-map-top);
+  width: var(--osrs-minimap-map-size);
+  height: var(--osrs-minimap-map-size);
   border-radius: 50%;
   overflow: hidden;
   z-index: 1;
@@ -172,17 +172,17 @@ body,
 
 .osrs-minimap-canvas {
   display: block;
-  width: 146px;
-  height: 146px;
+  width: var(--osrs-minimap-map-size);
+  height: var(--osrs-minimap-map-size);
   image-rendering: pixelated;
 }
 
 .osrs-minimap-compass {
   position: absolute;
-  left: 47px;
-  top: 6px;
-  width: 28px;
-  height: 28px;
+  left: var(--osrs-minimap-compass-left);
+  top: var(--osrs-minimap-compass-top);
+  width: var(--osrs-minimap-compass-size);
+  height: var(--osrs-minimap-compass-size);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -203,10 +203,10 @@ body,
 
 .osrs-minimap-frame {
   position: absolute;
-  left: 41px;
+  left: var(--osrs-minimap-frame-left);
   top: 0;
-  width: 172px;
-  height: 156px;
+  width: var(--osrs-minimap-frame-width);
+  height: var(--osrs-minimap-frame-height);
   z-index: 3;
   image-rendering: pixelated;
   pointer-events: none;
@@ -216,25 +216,34 @@ body,
   content: '';
   position: absolute;
   bottom: 0;
-  left: 2px;
-  width: 249px;
-  height: 8px;
+  left: var(--osrs-minimap-bottom-left);
+  width: var(--osrs-minimap-bottom-width);
+  height: var(--osrs-minimap-bottom-height);
   background: var(--osrs-url-minimap-bottom) no-repeat;
+  background-size: var(--osrs-minimap-bottom-width) var(--osrs-minimap-bottom-height);
 }
 
-.osrs-tab-strip {
-  width: 253px;
+.osrs-sidebar-body {
+  height: var(--osrs-sidebar-body-height);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  background:
+    var(--osrs-url-minimap-left) repeat-y left top,
+    var(--osrs-url-minimap-right) repeat-y right top;
+  background-size:
+    var(--osrs-minimap-left-edge) auto,
+    var(--osrs-minimap-right-edge) auto;
 }
 
-.osrs-tab-strip-row {
-  height: 37px;
-  padding: 2px 4px;
+.osrs-tab-strip {
+  width: var(--osrs-tab-strip-width);
+  height: var(--osrs-tab-bar-height);
+  margin-left: var(--osrs-tab-strip-left);
+  flex-shrink: 0;
   background-repeat: no-repeat;
-  background-position: center;
-  background-size: 249px 38px;
+  background-position: center top;
+  background-size: var(--osrs-tab-strip-width) calc(var(--osrs-tab-bar-height) + 1px);
 }
 
 .osrs-tab-strip-top {
@@ -246,16 +255,21 @@ body,
 }
 
 .osrs-tab-strip-inner {
-  display: flex;
-  gap: 1px;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(var(--osrs-tab-slot-count), 1fr);
+  width: var(--osrs-tab-strip-width);
   height: 100%;
+  margin: 0 auto;
 }
 
 .osrs-game-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 1px 0 0;
   border: none;
-  padding: 0;
   background: transparent;
   cursor: default;
   opacity: 0.65;
@@ -272,23 +286,30 @@ body,
 }
 
 .osrs-game-tab img {
+  display: block;
+  width: 100%;
+  max-width: 33px;
+  height: auto;
+  max-height: 33px;
   image-rendering: pixelated;
 }
 
 .osrs-interface-panel {
-  flex: 1;
-  width: 253px;
-  background: var(--osrs-url-side-panel) repeat;
+  position: relative;
+  width: var(--osrs-side-panel-width);
+  height: var(--osrs-interface-panel-height);
+  margin-left: var(--osrs-side-panel-left);
+  flex-shrink: 0;
+  background: var(--osrs-url-side-panel) no-repeat center top;
+  background-size: var(--osrs-side-panel-width) var(--osrs-interface-panel-height);
   overflow: hidden;
-  border-top: 1px solid #544834;
 }
 
 /* ── Control panel content (sailing options, skills, …) ── */
 .osrs-control-panel {
-  width: 190px;
-  height: 100%;
-  margin: 0 auto;
-  padding: 4px 2px;
+  width: var(--osrs-side-panel-width);
+  height: var(--osrs-interface-panel-height);
+  padding: 4px 6px;
   overflow-y: auto;
   overflow-x: hidden;
 }

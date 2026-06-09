@@ -63,9 +63,6 @@ export function trickFeatureRideUnitVector(zone: TrickZone): { x: number; y: num
   const cos = Math.cos(r);
   const sin = Math.sin(r);
 
-  if (zone.type === 'jump') {
-    return { x: -cos, y: -sin };
-  }
   return { x: cos, y: sin };
 }
 

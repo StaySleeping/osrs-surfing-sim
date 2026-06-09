@@ -22,8 +22,10 @@ export const OSRS_ASSETS = {
   tabs: {
     combat: osrsAssetUrl('tab/combat.png'),
     stats: osrsAssetUrl('tab/stats.png'),
+    quests: osrsAssetUrl('tab/quests.png'),
     sailing: osrsAssetUrl('tab/sailing.png'),
     inventory: osrsAssetUrl('tab/inventory.png'),
+    equipment: osrsAssetUrl('tab/equipment.png'),
     prayer: osrsAssetUrl('tab/prayer.png'),
     magic: osrsAssetUrl('tab/magic.png'),
     friends: osrsAssetUrl('tab/friends.png'),

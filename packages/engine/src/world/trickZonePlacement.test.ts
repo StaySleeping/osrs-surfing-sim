@@ -220,8 +220,8 @@ describe('trickZoneRotationRadians', () => {
     expect(trickZoneRotationRadians(slotAngle, true, 'rail')).toBeCloseTo(slotAngle + Math.PI / 2);
   });
 
-  it('inverts spawn rotation for jumps because the mesh faces the approach', () => {
-    expect(trickZoneRotationRadians(slotAngle, false, 'jump')).toBeCloseTo(slotAngle + Math.PI / 2);
-    expect(trickZoneRotationRadians(slotAngle, true, 'jump')).toBeCloseTo(slotAngle - Math.PI / 2);
+  it('matches reef clockwise tangent for jumps', () => {
+    expect(trickZoneRotationRadians(slotAngle, false, 'jump')).toBeCloseTo(slotAngle - Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, true, 'jump')).toBeCloseTo(slotAngle + Math.PI / 2);
   });
 });
