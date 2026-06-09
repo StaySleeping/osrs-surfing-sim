@@ -34,12 +34,12 @@ export const TAB_BAR_HEIGHT = 37;
 export const TAB_BAR_ROWS = 2;
 export const TAB_SLOT_COUNT = 7;
 
-export const SIDE_PANEL_WIDTH = 190;
-export const SIDE_PANEL_HEIGHT = 261;
-export const SIDE_PANEL_LEFT = (SIDEBAR_WIDTH - SIDE_PANEL_WIDTH) / 2;
+export const SIDEBAR_BODY_HEIGHT = CLIENT_GRID_HEIGHT - MINIMAP_HEIGHT;
+export const INTERFACE_PANEL_HEIGHT = SIDEBAR_BODY_HEIGHT - TAB_BAR_HEIGHT * TAB_BAR_ROWS;
 
-export const SIDEBAR_BODY_HEIGHT =
-  CLIENT_GRID_HEIGHT - MINIMAP_HEIGHT - TAB_BAR_HEIGHT * TAB_BAR_ROWS;
+export const SIDE_PANEL_WIDTH = 190;
+export const SIDE_PANEL_HEIGHT = INTERFACE_PANEL_HEIGHT;
+export const SIDE_PANEL_LEFT = (SIDEBAR_WIDTH - SIDE_PANEL_WIDTH) / 2;
 
 /** Camera yaw (rad) when north is up on screen — used for compass snap. */
 export const CAMERA_YAW_NORTH = Math.PI / 2;

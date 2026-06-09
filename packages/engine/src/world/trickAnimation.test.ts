@@ -89,7 +89,7 @@ describe('trick animation', () => {
 
     const jumpZone: TrickZone = { ...zone, type: 'jump', prepareSlot: 2, rotationRadians: 0 };
     const jumpRide = trickFeatureRideUnitVector(jumpZone);
-    expect(jumpRide.x).toBeCloseTo(-1);
+    expect(jumpRide.x).toBeCloseTo(1);
     expect(jumpRide.y).toBeCloseTo(0);
   });
 

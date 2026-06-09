@@ -6,9 +6,11 @@ export type ControlPanelTabId = 'combat' | 'stats';
 const TOP_TABS = [
   { id: 'combat' as const, icon: OSRS_ASSETS.tabs.combat, label: 'Sailing Options' },
   { id: 'stats' as const, icon: OSRS_ASSETS.tabs.stats, label: 'Skills' },
-  { id: 'inventory', icon: OSRS_ASSETS.tabs.inventory, label: 'Inventory' },
-  { id: 'prayer', icon: OSRS_ASSETS.tabs.prayer, label: 'Prayer' },
-  { id: 'magic', icon: OSRS_ASSETS.tabs.magic, label: 'Magic' },
+  { icon: OSRS_ASSETS.tabs.quests, label: 'Quest List' },
+  { icon: OSRS_ASSETS.tabs.inventory, label: 'Inventory' },
+  { icon: OSRS_ASSETS.tabs.equipment, label: 'Worn Equipment' },
+  { icon: OSRS_ASSETS.tabs.prayer, label: 'Prayer' },
+  { icon: OSRS_ASSETS.tabs.magic, label: 'Magic' },
 ] as const;
 
 const BOTTOM_TABS = [
@@ -22,12 +24,18 @@ const BOTTOM_TABS = [
 ] as const;
 
 export class OsrsTabStrip {
-  private root: HTMLElement;
+  private topRoot: HTMLElement;
+  private bottomRoot: HTMLElement;
   private activeTab: ControlPanelTabId = 'combat';
   private onTabChange: (tab: ControlPanelTabId) => void;
 
-  constructor(root: HTMLElement, onTabChange: (tab: ControlPanelTabId) => void) {
-    this.root = root;
+  constructor(
+    topRoot: HTMLElement,
+    bottomRoot: HTMLElement,
+    onTabChange: (tab: ControlPanelTabId) => void,
+  ) {
+    this.topRoot = topRoot;
+    this.bottomRoot = bottomRoot;
     this.onTabChange = onTabChange;
     this.render();
   }
@@ -38,18 +46,14 @@ export class OsrsTabStrip {
   }
 
   private render(): void {
-    this.root.innerHTML = `
-      <div class="osrs-tab-strip-row osrs-tab-strip-top">
-        <div class="osrs-tab-strip-inner"></div>
-      </div>
-      <div class="osrs-tab-strip-row osrs-tab-strip-bottom">
-        <div class="osrs-tab-strip-inner"></div>
-      </div>
-    `;
+    this.topRoot.className = 'osrs-tab-strip osrs-tab-strip-top';
+    this.bottomRoot.className = 'osrs-tab-strip osrs-tab-strip-bottom';
 
-    const rows = this.root.querySelectorAll('.osrs-tab-strip-inner');
-    const topInner = rows[0];
-    const bottomInner = rows[1];
+    this.topRoot.innerHTML = `<div class="osrs-tab-strip-inner"></div>`;
+    this.bottomRoot.innerHTML = `<div class="osrs-tab-strip-inner"></div>`;
+
+    const topInner = this.topRoot.querySelector('.osrs-tab-strip-inner');
+    const bottomInner = this.bottomRoot.querySelector('.osrs-tab-strip-inner');
     if (!topInner || !bottomInner) {
       return;
     }
@@ -84,13 +88,13 @@ export class OsrsTabStrip {
         ${tab.id ? `data-tab="${tab.id}"` : ''}
         ${isInteractive ? '' : 'disabled'}
       >
-        <img src="${tab.icon}" alt="${tab.label}" width="33" height="36" />
+        <img src="${tab.icon}" alt="${tab.label}" />
       </button>
     `;
   }
 
   private syncActiveState(): void {
-    this.root.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((btn) => {
+    this.topRoot.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tab === this.activeTab);
     });
   }

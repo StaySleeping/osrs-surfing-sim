@@ -169,8 +169,8 @@ function buildJumpGroup(
   );
   lip.position.set(0, radius * 0.35, radius * 0.45);
   group.add(ramp, lip);
-  // Ramp/lip run opposite to tunnel +Z; flip so lip faces the ride direction.
-  group.rotation.y = (3 * Math.PI) / 2;
+  // Meshes are built along +Z; align with reef tangent (rails use +X).
+  group.rotation.y = Math.PI / 2;
   return group;
 }
 
@@ -238,18 +238,9 @@ function buildTrickGroup(
   }
 }
 
-function approachChevronRotationY(type: TrickFeatureType): number {
-  return type === 'jump' ? -Math.PI / 2 : Math.PI / 2;
-}
-
-function addApproachChevrons(
-  group: Group,
-  type: TrickFeatureType,
-  radius: number,
-  alpha: number,
-): void {
+function addApproachChevrons(group: Group, radius: number, alpha: number): void {
   const chevrons = new Group();
-  chevrons.rotation.y = approachChevronRotationY(type);
+  chevrons.rotation.y = Math.PI / 2;
   const material = makeMaterial(0xfff566, alpha * 0.9);
   for (const offset of [-0.72, -0.52, -0.32]) {
     const cone = new Mesh(new ConeGeometry(radius * 0.15, radius * 0.25, 3), material);
@@ -345,7 +336,7 @@ export class TrickFeatureLayer {
           snapshot.trickPrepare !== null &&
           snapshot.trickPrepare.slot === zone.prepareSlot
         ) {
-          addApproachChevrons(group, zone.type, zone.radius, featureAlpha);
+          addApproachChevrons(group, zone.radius, featureAlpha);
         }
         this.meshKeys[i] = meshKey;
       } else {

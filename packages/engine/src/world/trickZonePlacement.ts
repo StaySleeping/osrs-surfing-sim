@@ -65,20 +65,14 @@ export function clockwiseTangent(angle: number): number {
   return angle - Math.PI / 2;
 }
 
-/**
- * Stored zone rotation: ride axis for most features; approach heading for jumps
- * (jump meshes are built opposite to other +Z features).
- */
+/** Stored zone rotation: reef ride tangent (clockwise) or counter-ride. */
 export function trickZoneRotationRadians(
   positionAngle: number,
   counterRide: boolean,
-  type: TrickFeatureType,
+  _type: TrickFeatureType,
 ): number {
   const reefClockwise = clockwiseTangent(positionAngle);
   const reefCounter = positionAngle + Math.PI / 2;
-  if (type === 'jump') {
-    return counterRide ? reefClockwise : reefCounter;
-  }
   return counterRide ? reefCounter : reefClockwise;
 }
 

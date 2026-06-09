@@ -95,7 +95,8 @@ export class OsrsClient {
     const shopPanelRoot = document.getElementById('shop-panel');
     const debugPanelRoot = document.getElementById('debug-panel');
     const chatboxRoot = document.getElementById('chatbox-root');
-    const tabStripRoot = document.getElementById('tab-strip');
+    const tabStripTopRoot = document.getElementById('tab-strip-top');
+    const tabStripBottomRoot = document.getElementById('tab-strip-bottom');
     const minimapMapRoot = document.getElementById('minimap-map');
     const minimapCompass = document.getElementById('minimap-compass') as HTMLButtonElement | null;
     const minimapFrame = document.getElementById('minimap-frame') as HTMLImageElement | null;
@@ -107,7 +108,8 @@ export class OsrsClient {
       !shopPanelRoot ||
       !debugPanelRoot ||
       !chatboxRoot ||
-      !tabStripRoot ||
+      !tabStripTopRoot ||
+      !tabStripBottomRoot ||
       !minimapMapRoot ||
       !minimapCompass ||
       !minimapFrame
@@ -179,7 +181,9 @@ export class OsrsClient {
       skillsPanel.setVisible(tab === 'stats');
       tabStrip.setActiveTab(tab);
     };
-    const tabStrip = new OsrsTabStrip(tabStripRoot, (tab) => showControlPanelTab(tab, tabStrip));
+    const tabStrip = new OsrsTabStrip(tabStripTopRoot, tabStripBottomRoot, (tab) =>
+      showControlPanelTab(tab, tabStrip),
+    );
 
     const client = new OsrsClient(
       simulation,
