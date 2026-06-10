@@ -66,11 +66,7 @@ export function clockwiseTangent(angle: number): number {
 }
 
 /** Stored zone rotation: reef ride tangent (clockwise) or counter-ride. */
-export function trickZoneRotationRadians(
-  positionAngle: number,
-  counterRide: boolean,
-  _type: TrickFeatureType,
-): number {
+export function trickZoneRotationRadians(positionAngle: number, counterRide: boolean): number {
   const reefClockwise = clockwiseTangent(positionAngle);
   const reefCounter = positionAngle + Math.PI / 2;
   return counterRide ? reefCounter : reefClockwise;
@@ -158,7 +154,7 @@ export function createTrickZoneAtAngle(
 
   const type = pickRandomTrickType(random);
   const counterRide = random() < COUNTER_RIDE_CHANCE;
-  const rotationRadians = trickZoneRotationRadians(positionAngle, counterRide, type);
+  const rotationRadians = trickZoneRotationRadians(positionAngle, counterRide);
 
   return {
     id,

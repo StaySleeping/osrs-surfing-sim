@@ -213,15 +213,13 @@ describe('trickZoneRotationRadians', () => {
   const slotAngle = 0.4;
 
   it('matches reef clockwise tangent for rails and tunnels', () => {
-    expect(trickZoneRotationRadians(slotAngle, false, 'rail')).toBeCloseTo(slotAngle - Math.PI / 2);
-    expect(trickZoneRotationRadians(slotAngle, false, 'tunnel')).toBeCloseTo(
-      slotAngle - Math.PI / 2,
-    );
-    expect(trickZoneRotationRadians(slotAngle, true, 'rail')).toBeCloseTo(slotAngle + Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, false)).toBeCloseTo(slotAngle - Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, false)).toBeCloseTo(slotAngle - Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, true)).toBeCloseTo(slotAngle + Math.PI / 2);
   });
 
   it('matches reef clockwise tangent for jumps', () => {
-    expect(trickZoneRotationRadians(slotAngle, false, 'jump')).toBeCloseTo(slotAngle - Math.PI / 2);
-    expect(trickZoneRotationRadians(slotAngle, true, 'jump')).toBeCloseTo(slotAngle + Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, false)).toBeCloseTo(slotAngle - Math.PI / 2);
+    expect(trickZoneRotationRadians(slotAngle, true)).toBeCloseTo(slotAngle + Math.PI / 2);
   });
 });
