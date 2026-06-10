@@ -1,21 +1,36 @@
-import type { SimulationSnapshot, WorldMap } from '@osrs-surfing/engine';
+import {
+  TIDE_LEADING_WASH_HEIGHT,
+  tideWaveSurfaceAtAngle,
+  type SimulationSnapshot,
+  type TideState,
+  type WorldMap,
+} from '@osrs-surfing/engine';
 
 import { renderVariantColor, resolveRenderTileVariant } from '../render/tileAppearance.js';
 import { MINIMAP_MAP_SIZE } from './minimapLayout.js';
 import { OSRS_ASSETS } from './osrsAssets.js';
 
-interface TileCoord {
+interface CoralTile {
   tx: number;
   ty: number;
+  angle: number;
 }
+
+/** Flood share where coral flips to its submerged colour (resolveRenderTileVariant). */
+const CORAL_SUBMERGE_FLOOD = 0.35;
+/** Repaint the tide overlay once the phase has advanced this far (≈ once a tick). */
+const TIDE_REPAINT_PHASE_DELTA = 0.04;
 
 export class OsrsMinimap {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private compassNeedle: HTMLImageElement;
   private baseCanvas: HTMLCanvasElement | null = null;
+  private tideCanvas: HTMLCanvasElement | null = null;
+  private tideCtx: CanvasRenderingContext2D | null = null;
+  private lastTidePhase = Number.NaN;
   private baseMap: WorldMap | null = null;
-  private coralTiles: TileCoord[] = [];
+  private coralTiles: CoralTile[] = [];
 
   constructor(
     mapRoot: HTMLElement,
@@ -78,7 +93,7 @@ export class OsrsMinimap {
         const tile = map.tiles[ty][tx];
         let variant = resolveRenderTileVariant(tile, tx + 0.5, ty + 0.5, null);
         if (tile === 'coral_rideable') {
-          this.coralTiles.push({ tx, ty });
+          this.coralTiles.push({ tx, ty, angle: Number.NaN });
           variant = 'reef_exposed';
         }
         const color = renderVariantColor(variant);
@@ -88,11 +103,50 @@ export class OsrsMinimap {
     }
 
     this.baseCanvas = base;
+    const tideCanvas = document.createElement('canvas');
+    tideCanvas.width = size;
+    tideCanvas.height = size;
+    this.tideCanvas = tideCanvas;
+    this.tideCtx = tideCanvas.getContext('2d');
+    this.lastTidePhase = Number.NaN;
     this.baseMap = map;
+  }
+
+  /** Submerged-coral overlay; repainted only when the tide has moved a tick's worth. */
+  private repaintTideOverlay(tide: TideState, map: WorldMap): void {
+    const ctx = this.tideCtx;
+    if (!ctx) {
+      return;
+    }
+    const phaseDelta = Math.abs(tide.phaseRadians - this.lastTidePhase);
+    if (phaseDelta < TIDE_REPAINT_PHASE_DELTA) {
+      return;
+    }
+    this.lastTidePhase = tide.phaseRadians;
+
+    const size = MINIMAP_MAP_SIZE;
+    const scaleX = size / map.widthTiles;
+    const scaleY = size / map.heightTiles;
+    ctx.clearRect(0, 0, size, size);
+    const submergedColor = renderVariantColor('reef_submerged');
+    ctx.fillStyle = `#${submergedColor.toString(16).padStart(6, '0')}`;
+
+    for (const coral of this.coralTiles) {
+      if (Number.isNaN(coral.angle)) {
+        coral.angle = Math.atan2(coral.ty + 0.5 - tide.centerY, coral.tx + 0.5 - tide.centerX);
+      }
+      const flood = tideWaveSurfaceAtAngle(coral.angle, tide) / TIDE_LEADING_WASH_HEIGHT;
+      if (flood > CORAL_SUBMERGE_FLOOD) {
+        ctx.fillRect(coral.tx * scaleX, coral.ty * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
+      }
+    }
   }
 
   update(snapshot: SimulationSnapshot, map: WorldMap): void {
     this.ensureBaseCanvas(map);
+    if (snapshot.tide) {
+      this.repaintTideOverlay(snapshot.tide, map);
+    }
 
     const ctx = this.ctx;
     const size = MINIMAP_MAP_SIZE;
@@ -109,14 +163,8 @@ export class OsrsMinimap {
     if (this.baseCanvas) {
       ctx.drawImage(this.baseCanvas, 0, 0);
     }
-
-    const submergedColor = renderVariantColor('reef_submerged');
-    ctx.fillStyle = `#${submergedColor.toString(16).padStart(6, '0')}`;
-    for (const { tx, ty } of this.coralTiles) {
-      const variant = resolveRenderTileVariant('coral_rideable', tx + 0.5, ty + 0.5, snapshot.tide);
-      if (variant === 'reef_submerged') {
-        ctx.fillRect(tx * scaleX, ty * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
-      }
+    if (this.tideCanvas) {
+      ctx.drawImage(this.tideCanvas, 0, 0);
     }
 
     const px = snapshot.surfboard.position.x * scaleX;

@@ -3,39 +3,74 @@ export const CORAL_PARK_MAP_HEIGHT = 448;
 export const CORAL_PARK_ISLAND_CX = CORAL_PARK_MAP_WIDTH / 2;
 export const CORAL_PARK_ISLAND_CY = CORAL_PARK_MAP_HEIGHT / 2;
 
-const GRASS_BASE = 8;
-const SAND_BASE = 17;
-const SHALLOW_BASE = 23;
-const REEF_INNER_BASE = 25;
-const REEF_OUTER_BASE = 64;
+const GRASS_BASE = 40;
+const SAND_BASE = 52;
+const SHALLOW_BASE = 60;
+const REEF_INNER_BASE = 66;
+const REEF_OUTER_BASE = 120;
 
-const GRASS_WOBBLE = 1.1;
-const SAND_WOBBLE = 1.6;
-const SHALLOW_WOBBLE = 2;
-const REEF_INNER_WOBBLE = 2.4;
-const REEF_OUTER_WOBBLE = 5.2;
+const GRASS_WOBBLE = 16;
+const SAND_WOBBLE = 16.5;
+const SHALLOW_WOBBLE = 17;
+const REEF_INNER_WOBBLE = 17.5;
+const REEF_OUTER_WOBBLE = 14;
 
-/** Soft bays and headlands for the island and inner reef edge. */
-function islandCoastRadius(angle: number, base: number, wobble: number): number {
-  return (
-    base +
-    wobble *
-      (0.44 * Math.sin(angle * 2.2 + 0.55) +
-        0.3 * Math.sin(angle * 3.9 + 1.85) +
-        0.18 * Math.sin(angle * 6.3 + 0.95) +
-        0.12 * Math.sin(angle * 8.7 + 2.6))
-  );
+/** Deep bay carved into the north-east coast (radians / tiles). */
+const BAY_ANGLE = -0.9;
+const BAY_WIDTH = 0.55;
+const BAY_DEPTH = 16;
+
+/** Long headland pointing south-west. */
+const HEADLAND_ANGLE = 2.3;
+const HEADLAND_WIDTH = 0.45;
+const HEADLAND_GAIN = 8;
+
+/** Keep a usable island core even where the bay and harmonics align. */
+const MIN_GRASS_RADIUS = 14;
+
+function angularFalloff(angle: number, center: number, width: number): number {
+  let delta = angle - center;
+  while (delta > Math.PI) {
+    delta -= Math.PI * 2;
+  }
+  while (delta < -Math.PI) {
+    delta += Math.PI * 2;
+  }
+  return Math.exp(-(delta * delta) / (2 * width * width));
 }
 
-/** Lumpier, lower-frequency edge so the outer reef reads differently from the island. */
+/**
+ * Bays and headlands for the island and inner reef edge. Integer angular
+ * frequencies keep the coastline seamless across the atan2 wrap at ±π. The
+ * same absolute offset shifts every island ring so beach widths stay intact.
+ */
+function islandShapeOffset(angle: number, wobble: number): number {
+  const harmonics =
+    0.26 * Math.sin(angle + 0.7) +
+    0.5 * Math.sin(angle * 2 + 0.55) +
+    0.34 * Math.sin(angle * 3 + 1.85) +
+    0.18 * Math.sin(angle * 5 + 0.95) +
+    0.08 * Math.sin(angle * 8 + 2.6);
+  const offset =
+    wobble * harmonics -
+    BAY_DEPTH * angularFalloff(angle, BAY_ANGLE, BAY_WIDTH) +
+    HEADLAND_GAIN * angularFalloff(angle, HEADLAND_ANGLE, HEADLAND_WIDTH);
+  return Math.max(offset, MIN_GRASS_RADIUS - GRASS_BASE);
+}
+
+function islandCoastRadius(angle: number, base: number, wobble: number): number {
+  return base + islandShapeOffset(angle, wobble);
+}
+
+/** Lumpier mix so the outer reef reads differently from the island. */
 function outerReefRadius(angle: number, base: number, wobble: number): number {
   return (
     base +
     wobble *
-      (0.38 * Math.sin(angle * 1.45 + 2.35) +
-        0.27 * Math.sin(angle * 3.2 + 0.15) +
-        0.2 * Math.sin(angle * 5.6 + 3.05) +
-        0.15 * Math.sin(angle * 9.4 + 1.2))
+      (0.38 * Math.sin(angle + 2.35) +
+        0.27 * Math.sin(angle * 3 + 0.15) +
+        0.2 * Math.sin(angle * 6 + 3.05) +
+        0.15 * Math.sin(angle * 9 + 1.2))
   );
 }
 
@@ -82,7 +117,7 @@ export const CORAL_PARK_SAND_OUTER_SURFACE_Y = 0.1;
 export const CORAL_PARK_GRASS_EDGE_SURFACE_Y = 0.25;
 
 /** Island summit at the map centre (world Y). */
-export const CORAL_PARK_GRASS_PEAK_SURFACE_Y = 2.4;
+export const CORAL_PARK_GRASS_PEAK_SURFACE_Y = 3.6;
 
 /** Cache-bust key for land mesh rebuilds when the knobs above change. */
 export function coralParkLandElevationKey(): string {

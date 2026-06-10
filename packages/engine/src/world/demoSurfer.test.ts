@@ -85,7 +85,7 @@ describe('demoSurfer', () => {
     let unwrap = 0;
     let prevAngle: number | null = null;
 
-    for (let i = 0; i < 1200; i += 1) {
+    for (let i = 0; i < 2400; i += 1) {
       const before = sim.getSnapshot().demoSurfer?.trickAnimation;
       sim.tick();
       const demo = sim.getSnapshot().demoSurfer;
