@@ -9,6 +9,7 @@ import {
 import type { ProgressionState, UnlockId } from '../progression/types.js';
 import { type OnFootWalkState, planWalkPath, tickOnFootPath } from '../movement/onFoot.js';
 import { headingFromClick } from '../movement/surfboard.js';
+import { headingToDegrees } from '../movement/heading.js';
 import {
   createSurfboard,
   tickSurfboard,
@@ -124,6 +125,7 @@ export class GameSimulation {
   private activeTrickZoneId: string | null = null;
   private trickAnimation: TrickAnimationState | null = null;
   private tideFrozen = false;
+  private cameraFacingRadians: number | null = null;
   private movementFrozen = false;
   private readonly boardInteractRadius = 1.3;
   private demoSurfers: ReturnType<typeof createDemoSurfer>[] = [];
@@ -517,6 +519,11 @@ export class GameSimulation {
     this.stats = { ...this.stats, ...stats };
   }
 
+  /** Camera view direction in tile-space radians — drives the show-off surfer. */
+  setCameraFacing(radians: number): void {
+    this.cameraFacingRadians = radians;
+  }
+
   setTideFrozen(frozen: boolean): void {
     this.tideFrozen = frozen;
   }
@@ -589,8 +596,15 @@ export class GameSimulation {
 
     this.checkProximityDialogue();
 
+    const audience = {
+      x: this.surfboard.position.x,
+      y: this.surfboard.position.y,
+      facingRadians:
+        this.cameraFacingRadians ??
+        (headingToDegrees(this.surfboard.currentHeading) * Math.PI) / 180,
+    };
     this.demoSurfers = this.demoSurfers.map((surfer) =>
-      tickDemoSurfer(surfer, this.arena.map, this.trickZones, this.tide),
+      tickDemoSurfer(surfer, this.arena.map, this.trickZones, this.tide, audience),
     );
 
     this.tickCount += 1;

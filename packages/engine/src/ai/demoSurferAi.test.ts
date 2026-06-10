@@ -15,6 +15,7 @@ import {
   DEMO_SURFER_RING_DEPTH,
   DEMO_SURFER_SPIN_LEADING_FRACTION,
   isDryZoneFrontHalf,
+  isNearTideEdge,
   reefRideClockwiseRadians,
   shouldStartTideSpin,
   targetRingDepth,
@@ -138,7 +139,7 @@ describe('demoSurferAi', () => {
         exposedZone.center.y - CORAL_PARK_ISLAND_CY,
         exposedZone.center.x - CORAL_PARK_ISLAND_CX,
       );
-      if (isDryZoneFrontHalf(zoneAngle, tide)) {
+      if (isDryZoneFrontHalf(zoneAngle, tide) && !isNearTideEdge(zoneAngle - 0.22, tide)) {
         break;
       }
       tide = tickTide(tide);

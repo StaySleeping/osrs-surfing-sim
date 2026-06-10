@@ -89,7 +89,13 @@ describe('createCoralParkSlice', () => {
     expect(mapTile(arena.map, arena.npcs[0].x, arena.npcs[0].y)).toBe('sand');
     expect(mapTile(arena.map, arena.boardDockX, arena.boardDockY)).toBe('sand');
     expect(arena.npcs).toHaveLength(1);
-    expect(arena.demoSurfers.map((surfer) => surfer.name)).toEqual(['Nalu', 'Kai', 'Hina', 'Tama']);
+    expect(arena.demoSurfers.map((surfer) => surfer.name)).toEqual([
+      'Nalu',
+      'Kai',
+      'Hina',
+      'Tama',
+      'Koa',
+    ]);
     for (const surfer of arena.demoSurfers) {
       expect(mapTile(arena.map, surfer.startX, surfer.startY)).toBe('coral_rideable');
     }

@@ -10,6 +10,7 @@ import {
   tideSpinTargetHeading,
   type DemoSurferAiState,
   type DemoSurferBehavior,
+  type ShowoffAudience,
 } from '../ai/demoSurferAi.js';
 import { DEFAULT_SURFBOARD_STATS } from '../constants/movement.js';
 import type { HeadingIndex } from '../movement/heading.js';
@@ -42,6 +43,8 @@ export interface DemoSurferConfig {
   startY: number;
   startHeading: HeadingIndex;
   behavior?: DemoSurferBehavior;
+  /** Scales board speed and turn rate relative to the shared stats. */
+  speedMultiplier?: number;
 }
 
 export interface DemoSurferSnapshot {
@@ -80,6 +83,16 @@ export function createDemoSurfer(
   stats?: SurfboardStats,
 ): DemoSurferRuntime {
   const board = createSurfboard(config.startX, config.startY, config.startHeading);
+  const baseStats = stats ?? { ...DEFAULT_SURFBOARD_STATS };
+  const multiplier = config.speedMultiplier ?? 1;
+  const surferStats =
+    multiplier === 1
+      ? baseStats
+      : {
+          turnRateDegPerTick: baseStats.turnRateDegPerTick * multiplier,
+          speedPaddle: baseStats.speedPaddle * multiplier,
+          speedRide: baseStats.speedRide * multiplier,
+        };
   return {
     config,
     behavior: config.behavior ?? DEFAULT_DEMO_SURFER_BEHAVIOR,
@@ -92,7 +105,7 @@ export function createDemoSurfer(
     trickAnimation: null,
     activeTrickZoneId: null,
     tideSpinTicksRemaining: 0,
-    stats: stats ?? { ...DEFAULT_SURFBOARD_STATS },
+    stats: surferStats,
   };
 }
 
@@ -167,6 +180,7 @@ export function tickDemoSurfer(
   map: WorldMap,
   trickZones: TrickZone[],
   tide: TideState | null,
+  audience: ShowoffAudience | null = null,
 ): DemoSurferRuntime {
   if (runtime.trickAnimation) {
     const result = tickTrickAnimation(runtime.trickAnimation);
@@ -189,8 +203,14 @@ export function tickDemoSurfer(
   }
 
   const ringDepth =
-    runtime.behavior.kind === 'explorer' ? DEMO_SURFER_RING_DEPTH : runtime.behavior.ringDepth;
-  if (tide && shouldStartTideSpin(runtime.surfboard.position, runtime.surfboard, tide, ringDepth)) {
+    runtime.behavior.kind === 'loop' || runtime.behavior.kind === 'sector'
+      ? runtime.behavior.ringDepth
+      : DEMO_SURFER_RING_DEPTH;
+  if (
+    runtime.behavior.kind !== 'showoff' &&
+    tide &&
+    shouldStartTideSpin(runtime.surfboard.position, runtime.surfboard, tide, ringDepth)
+  ) {
     if (runtime.behavior.kind !== 'explorer') {
       return tickTideSpin({ ...runtime, tideSpinTicksRemaining: DEMO_SURFER_TIDE_SPIN_TICKS }, map);
     }
@@ -215,6 +235,7 @@ export function tickDemoSurfer(
     map,
     behavior: runtime.behavior,
     aiState: runtime.aiState,
+    audience,
   });
 
   const { prepareSlot, ...surfInput } = ai.input;

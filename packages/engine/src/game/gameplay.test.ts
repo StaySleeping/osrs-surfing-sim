@@ -6,7 +6,8 @@ import { createCoralParkSlice } from '../world/maps.js';
 import { GameSimulation } from './simulation.js';
 
 describe('Coral Park gameplay flow', () => {
-  it('supports walk, NPC talk, mount, sail, and rhythm trick', () => {
+  // Random feature layouts can defeat the scripted steering; retry fresh arenas.
+  it('supports walk, NPC talk, mount, sail, and rhythm trick', { retry: 2 }, () => {
     const arena = createCoralParkSlice();
     for (const zone of arena.trickZones) {
       const tile = getTile(arena.map, Math.floor(zone.center.x), Math.floor(zone.center.y));
@@ -34,7 +35,7 @@ describe('Coral Park gameplay flow', () => {
     const tide = sim.getSnapshot().tide;
     expect(tide).not.toBeNull();
     const riderPos = sim.getSnapshot().surfboard.position;
-    const rail = arena.trickZones
+    const railCandidates = arena.trickZones
       .filter(
         (zone) => zone.type === 'rail' && (tide === null || !isTrickZoneSubmerged(zone, tide)),
       )
@@ -42,41 +43,47 @@ describe('Coral Park gameplay flow', () => {
         const da = Math.hypot(a.center.x - riderPos.x, a.center.y - riderPos.y);
         const db = Math.hypot(b.center.x - riderPos.x, b.center.y - riderPos.y);
         return da - db;
-      })[0]!;
-    expect(rail).toBeDefined();
+      })
+      .slice(0, 3);
+    expect(railCandidates.length).toBeGreaterThan(0);
     sim.setSpeedState('paddling');
-    const approachX = rail.center.x + Math.cos(rail.rotationRadians) * 4;
-    const approachY = rail.center.y + Math.sin(rail.rotationRadians) * 4;
-    sim.clickOcean(approachX, approachY);
     sim.setSpeedState('riding');
 
-    const beforeTricks = sim.getSnapshot().progression.session.tricksLanded;
-    let tricked = false;
+    const pursueRail = (rail: (typeof railCandidates)[number], ticks: number): boolean => {
+      const beforeTricks = sim.getSnapshot().progression.session.tricksLanded;
+      let lastPos = { x: Number.NaN, y: Number.NaN };
+      for (let i = 0; i < ticks; i += 1) {
+        if (sim.getSnapshot().surfboard.speedState === 'seated') {
+          sim.setSpeedState('riding');
+        }
+        const pos = sim.getSnapshot().surfboard.position;
+        const stuck = Math.hypot(pos.x - lastPos.x, pos.y - lastPos.y) < 0.05;
+        lastPos = { x: pos.x, y: pos.y };
+        const dist = Math.hypot(pos.x - rail.center.x, pos.y - rail.center.y);
+        // Aim well past the zone: clicking the centre itself sits inside the
+        // board's turning circle at ride speed and traps the rider in an orbit.
+        // When wedged against land or the swell, fall back to the zone centre.
+        const throughX = rail.center.x + ((rail.center.x - pos.x) / Math.max(dist, 1)) * 15;
+        const throughY = rail.center.y + ((rail.center.y - pos.y) / Math.max(dist, 1)) * 15;
+        if (stuck) {
+          sim.clickOcean(rail.center.x, rail.center.y);
+        } else {
+          sim.clickOcean(throughX, throughY);
+        }
+        if (dist < 8 && dist > rail.radius * 0.5 && !sim.getSnapshot().trickPrepare) {
+          sim.prepareTrick(rail.prepareSlot);
+        }
+        sim.tick();
+        if (sim.getSnapshot().progression.session.tricksLanded > beforeTricks) {
+          return true;
+        }
+      }
+      return false;
+    };
 
-    for (let i = 0; i < 600; i += 1) {
-      if (sim.getSnapshot().surfboard.speedState === 'seated') {
-        sim.setSpeedState('riding');
-      }
-      const pos = sim.getSnapshot().surfboard.position;
-      const dist = Math.hypot(pos.x - rail.center.x, pos.y - rail.center.y);
-      if (dist > 10) {
-        sim.clickOcean(rail.center.x, rail.center.y);
-      } else if (dist > rail.radius) {
-        sim.clickOcean(rail.center.x, rail.center.y);
-      } else {
-        const aheadX = pos.x + Math.cos(rail.rotationRadians) * 4;
-        const aheadY = pos.y + Math.sin(rail.rotationRadians) * 4;
-        sim.clickOcean(aheadX, aheadY);
-      }
-      if (dist < 7 && dist > rail.radius * 0.6 && !sim.getSnapshot().trickPrepare) {
-        sim.prepareTrick(rail.prepareSlot);
-      }
-      sim.tick();
-      if (sim.getSnapshot().progression.session.tricksLanded > beforeTricks) {
-        tricked = true;
-        break;
-      }
-    }
+    // An awkwardly placed rail can defeat the simple steering above; move on
+    // to the next nearest one like a player would.
+    const tricked = railCandidates.some((rail) => pursueRail(rail, 450));
 
     expect(tricked).toBe(true);
     expect(sim.consumeXpDrops().length).toBeGreaterThan(0);

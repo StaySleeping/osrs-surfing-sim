@@ -17,6 +17,7 @@ import {
 import {
   DEMO_SURFER_RING_DEPTH,
   demoSurferSpawnOnReef,
+  SHOWOFF_FOLLOW_DISTANCE,
   type DemoSurferBehavior,
 } from '../ai/demoSurferAi.js';
 import type { DemoSurferConfig } from './demoSurfer.js';
@@ -108,43 +109,61 @@ const KAI_RING_DEPTH = 0.45;
 /** Hina cruises the outer reef line without chasing tricks. */
 const HINA_RING_DEPTH = 0.82;
 
+/** Koa shows off in front of the camera, riding hotter than the others. */
+const KOA_SPEED_MULTIPLIER = 1.25;
+
 function buildDemoSurfers(): DemoSurferConfig[] {
-  const surfers: { id: string; name: string; spawnAngle: number; behavior: DemoSurferBehavior }[] =
-    [
-      {
-        id: 'nalu',
-        name: 'Nalu',
-        spawnAngle: -Math.PI / 4,
-        behavior: { kind: 'loop', ringDepth: DEMO_SURFER_RING_DEPTH, doesTricks: true },
+  const surfers: {
+    id: string;
+    name: string;
+    spawnAngle: number;
+    behavior: DemoSurferBehavior;
+    speedMultiplier?: number;
+  }[] = [
+    {
+      id: 'nalu',
+      name: 'Nalu',
+      spawnAngle: -Math.PI / 4,
+      behavior: { kind: 'loop', ringDepth: DEMO_SURFER_RING_DEPTH, doesTricks: true },
+    },
+    {
+      id: 'kai',
+      name: 'Kai',
+      spawnAngle: KAI_SECTOR_CENTER_RADIANS,
+      behavior: {
+        kind: 'sector',
+        centerRadians: KAI_SECTOR_CENTER_RADIANS,
+        halfWidthRadians: KAI_SECTOR_HALF_WIDTH_RADIANS,
+        ringDepth: KAI_RING_DEPTH,
+        doesTricks: true,
       },
-      {
-        id: 'kai',
-        name: 'Kai',
-        spawnAngle: KAI_SECTOR_CENTER_RADIANS,
-        behavior: {
-          kind: 'sector',
-          centerRadians: KAI_SECTOR_CENTER_RADIANS,
-          halfWidthRadians: KAI_SECTOR_HALF_WIDTH_RADIANS,
-          ringDepth: KAI_RING_DEPTH,
-          doesTricks: true,
-        },
-      },
-      {
-        id: 'hina',
-        name: 'Hina',
-        spawnAngle: (-Math.PI * 3) / 4,
-        behavior: { kind: 'loop', ringDepth: HINA_RING_DEPTH, doesTricks: false },
-      },
-      {
-        id: 'tama',
-        name: 'Tama',
-        spawnAngle: Math.PI,
-        behavior: { kind: 'explorer' },
-      },
-    ];
+    },
+    {
+      id: 'hina',
+      name: 'Hina',
+      spawnAngle: (-Math.PI * 3) / 4,
+      behavior: { kind: 'loop', ringDepth: HINA_RING_DEPTH, doesTricks: false },
+    },
+    {
+      id: 'tama',
+      name: 'Tama',
+      spawnAngle: Math.PI,
+      behavior: { kind: 'explorer' },
+    },
+    {
+      id: 'koa',
+      name: 'Koa',
+      spawnAngle: Math.PI / 2 + 0.4,
+      behavior: { kind: 'showoff', followDistance: SHOWOFF_FOLLOW_DISTANCE },
+      speedMultiplier: KOA_SPEED_MULTIPLIER,
+    },
+  ];
 
   return surfers.map((surfer) => {
-    const ringDepth = surfer.behavior.kind === 'explorer' ? undefined : surfer.behavior.ringDepth;
+    const ringDepth =
+      surfer.behavior.kind === 'loop' || surfer.behavior.kind === 'sector'
+        ? surfer.behavior.ringDepth
+        : undefined;
     const spawn = demoSurferSpawnOnReef(surfer.spawnAngle, ringDepth);
     return {
       id: surfer.id,
@@ -153,6 +172,7 @@ function buildDemoSurfers(): DemoSurferConfig[] {
       startY: spawn.y,
       startHeading: spawn.heading,
       behavior: surfer.behavior,
+      speedMultiplier: surfer.speedMultiplier,
     };
   });
 }
