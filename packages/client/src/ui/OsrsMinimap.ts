@@ -44,7 +44,7 @@ export class OsrsMinimap {
       throw new Error('Minimap compass needle missing');
     }
     this.compassNeedle = needle;
-    this.compassNeedle.src = OSRS_ASSETS.fixed.compassNeedle;
+    this.compassNeedle.src = OSRS_ASSETS.fixed.compassDial;
     this.compassNeedle.alt = 'Compass';
 
     compassButton.addEventListener('click', onCompassClick);

@@ -13,12 +13,21 @@ export class DebugPanel {
   constructor(root: HTMLElement, initial: DebugTuning, onChange: (tuning: DebugTuning) => void) {
     this.root = root;
     this.tuning = { ...initial };
+    this.root.classList.add('hidden');
     this.root.innerHTML = `
-      <div><strong>Debug</strong> [1/2/3] tune turn/paddle/ride</div>
+      <div><strong>Debug</strong> [F3] hide, [1/2/3] tune turn/paddle/ride</div>
       <div id="debug-lines"></div>
     `;
 
     window.addEventListener('keydown', (event) => {
+      if (event.key === 'F3') {
+        event.preventDefault();
+        this.root.classList.toggle('hidden');
+        return;
+      }
+      if (this.root.classList.contains('hidden')) {
+        return;
+      }
       if (event.key === '1') {
         this.tuning.turnRate = Math.max(5, this.tuning.turnRate - 2.5);
         onChange(this.tuning);
@@ -47,6 +56,9 @@ export class DebugPanel {
   }
 
   update(snapshot: SimulationSnapshot): void {
+    if (this.root.classList.contains('hidden')) {
+      return;
+    }
     const lines = this.root.querySelector('#debug-lines');
     if (!lines) {
       return;

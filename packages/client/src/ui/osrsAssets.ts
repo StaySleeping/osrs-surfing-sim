@@ -12,7 +12,7 @@ export const OSRS_ASSETS = {
     minimapLeft: osrsAssetUrl('fixed_mode/minimap_left_edge.png'),
     minimapRight: osrsAssetUrl('fixed_mode/minimap_right_edge.png'),
     minimapBottom: osrsAssetUrl('fixed_mode/minimap_frame_bottom.png'),
-    compassNeedle: osrsAssetUrl('chevron/yellow_up_single.png'),
+    compassDial: osrsAssetUrl('other/compass.png'),
     tabsTop: osrsAssetUrl('fixed_mode/tabs_top_row.png'),
     tabsBottom: osrsAssetUrl('fixed_mode/tabs_row_bottom.png'),
   },
