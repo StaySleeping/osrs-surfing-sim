@@ -23,6 +23,7 @@ import { MapMeshBuilder } from './three/MapMeshBuilder.js';
 import { OsrsOrbitCamera } from './three/OsrsOrbitCamera.js';
 import { OverlayLayer } from './three/overlayMeshes.js';
 import { TrickFeatureLayer } from './three/trickFeatureMeshes.js';
+import { buildVillage, disposeVillage } from './three/villageMeshes.js';
 import { tileToWorld3, world3ToTile } from './three/worldCoords.js';
 
 const GROUND_PLANE = new Plane(new Vector3(0, 1, 0), 0);
@@ -40,6 +41,7 @@ export class ThreeRenderer implements IRenderer {
   private entities: EntityLayer | null = null;
   private tricks: TrickFeatureLayer | null = null;
   private overlays: OverlayLayer | null = null;
+  private village: ReturnType<typeof buildVillage> | null = null;
   private container: HTMLElement | null = null;
   private lastFrameMs = 0;
   private unbindPointer: (() => void) | null = null;
@@ -73,8 +75,15 @@ export class ThreeRenderer implements IRenderer {
     this.entities = new EntityLayer();
     this.tricks = new TrickFeatureLayer();
     this.overlays = new OverlayLayer();
+    this.village = buildVillage();
 
-    this.scene.add(this.mapMeshes.root, this.tricks.root, this.entities.root, this.overlays.root);
+    this.scene.add(
+      this.mapMeshes.root,
+      this.tricks.root,
+      this.entities.root,
+      this.overlays.root,
+      this.village,
+    );
 
     this.xpContainer = document.createElement('div');
     this.xpContainer.className = 'xp-drop-layer';
@@ -240,6 +249,10 @@ export class ThreeRenderer implements IRenderer {
     this.entities?.dispose();
     this.tricks?.dispose();
     this.overlays?.dispose();
+    if (this.village) {
+      disposeVillage(this.village);
+      this.village = null;
+    }
     this.mapMeshes?.destroy();
     this.renderer?.dispose();
     this.renderer?.domElement.remove();

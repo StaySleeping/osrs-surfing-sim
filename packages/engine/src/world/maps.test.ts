@@ -50,20 +50,14 @@ describe('createCoralParkSlice', () => {
     const east = 0;
 
     expect(getTile(map, CORAL_PARK_ISLAND_CX, CORAL_PARK_ISLAND_CY)).toBe('grass');
-    expect(
-      getTile(
-        map,
-        Math.floor(CORAL_PARK_ISLAND_CX + coralParkSandRadius(east) * 0.65),
-        CORAL_PARK_ISLAND_CY,
-      ),
-    ).toBe('sand');
-    expect(
-      getTile(
-        map,
-        Math.floor(CORAL_PARK_ISLAND_CX + coralParkShallowRadius(east) * 0.92),
-        CORAL_PARK_ISLAND_CY,
-      ),
-    ).toBe('shallow');
+    const beachMid = (coralParkGrassRadius(east) + coralParkSandRadius(east)) * 0.5;
+    expect(getTile(map, Math.floor(CORAL_PARK_ISLAND_CX + beachMid), CORAL_PARK_ISLAND_CY)).toBe(
+      'sand',
+    );
+    const shallowMid = (coralParkSandRadius(east) + coralParkShallowRadius(east)) * 0.5;
+    expect(getTile(map, Math.floor(CORAL_PARK_ISLAND_CX + shallowMid), CORAL_PARK_ISLAND_CY)).toBe(
+      'shallow',
+    );
     const reefMid = (coralParkReefInnerRadius(east) + coralParkReefOuterRadius(east)) * 0.5;
     expect(getTile(map, Math.floor(CORAL_PARK_ISLAND_CX + reefMid), CORAL_PARK_ISLAND_CY)).toBe(
       'coral_rideable',

@@ -39,6 +39,7 @@ export {
   CORAL_PARK_MAP_HEIGHT,
   CORAL_PARK_MAP_WIDTH,
   CORAL_PARK_SAND_OUTER_SURFACE_Y,
+  coralParkGrassRadius,
   coralParkLandElevationKey,
   coralParkLandSurfaceY,
 } from './coralParkCoast.js';
@@ -57,7 +58,7 @@ export interface GameArena {
   demoSurfer: DemoSurferConfig | null;
 }
 
-export const CORAL_PARK_TRICK_ZONE_COUNT = 15;
+export const CORAL_PARK_TRICK_ZONE_COUNT = 28;
 
 function buildTrickZones(map: WorldMap): TrickZone[] {
   const zones: TrickZone[] = [];

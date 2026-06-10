@@ -10,7 +10,7 @@ const DEFAULT_DISTANCE = 28;
 const MIN_PITCH = 0.15;
 const MAX_PITCH = 1.45;
 const MIN_DISTANCE = 8;
-const MAX_DISTANCE = 80;
+const MAX_DISTANCE = 160;
 
 const ARROW_YAW_SPEED = 1.8;
 const ARROW_PITCH_SPEED = 1.2;
