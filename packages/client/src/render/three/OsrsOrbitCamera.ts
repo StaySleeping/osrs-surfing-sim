@@ -60,16 +60,16 @@ export class OsrsOrbitCamera {
     const focusBlend = 1 - Math.exp(-FOCUS_SMOOTH_RATE * deltaSeconds);
     this.focusCurrent.lerp(this.focusTarget, focusBlend);
     if (this.arrowLeft) {
-      this.yaw -= ARROW_YAW_SPEED * deltaSeconds;
-    }
-    if (this.arrowRight) {
       this.yaw += ARROW_YAW_SPEED * deltaSeconds;
     }
+    if (this.arrowRight) {
+      this.yaw -= ARROW_YAW_SPEED * deltaSeconds;
+    }
     if (this.arrowUp) {
-      this.pitch = Math.max(MIN_PITCH, this.pitch - ARROW_PITCH_SPEED * deltaSeconds);
+      this.pitch = Math.min(MAX_PITCH, this.pitch + ARROW_PITCH_SPEED * deltaSeconds);
     }
     if (this.arrowDown) {
-      this.pitch = Math.min(MAX_PITCH, this.pitch + ARROW_PITCH_SPEED * deltaSeconds);
+      this.pitch = Math.max(MIN_PITCH, this.pitch - ARROW_PITCH_SPEED * deltaSeconds);
     }
 
     const cosPitch = Math.cos(this.pitch);
