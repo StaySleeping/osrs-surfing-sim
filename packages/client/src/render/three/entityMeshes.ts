@@ -18,7 +18,7 @@ import {
 
 import type { DisplaySimulationSnapshot, DisplayTrickAnimation } from '../visualSnapshot.js';
 import { tideSpinBoardPose, trickBoardPose } from './trickAnimationPose.js';
-import { headingToRotationY, tileToWorld3 } from './worldCoords.js';
+import { headingToRotationY, radiansToRotationY, tileToWorld3 } from './worldCoords.js';
 
 const PLAYER_SKIN = 0xc8945e;
 const PLAYER_SHIRT = 0x3a6ea5;
@@ -62,22 +62,31 @@ function boardRiderPose(
       : null;
   const world = tileToWorld3(tileX + (pose?.offsetX ?? 0), tileY + (pose?.offsetY ?? 0));
   const surfaceY = tideRideSurfaceY(tileX, tileY, tide);
+  const yawBase =
+    pose !== null && pose.travelYawRadians !== null
+      ? radiansToRotationY(pose.travelYawRadians)
+      : headingToRotationY(heading);
   return {
     worldX: world.x,
     worldZ: world.z,
     boardY: surfaceY + (pose?.liftY ?? 0),
-    rotationY: headingToRotationY(heading) + (pose?.yawOffset ?? 0),
+    rotationY: yawBase + (pose?.yawOffset ?? 0),
     pitch: pose?.pitch ?? 0,
     roll: pose?.roll ?? 0,
     riderLean: pose?.riderLean ?? 0,
   };
 }
 
+/**
+ * Meshes face +X, so with 'YXZ' Euler order: y = yaw, z = nose pitch (up
+ * positive), x = bank about the board's length axis — all in the local frame
+ * for any travel direction.
+ */
 function applyBoardRiderPose(board: Group, rider: Group, pose: BoardRiderPose): void {
   board.position.set(pose.worldX, pose.boardY, pose.worldZ);
-  board.rotation.set(pose.pitch, pose.rotationY, pose.roll);
+  board.rotation.set(pose.roll, pose.rotationY, pose.pitch);
   rider.position.set(pose.worldX, pose.boardY + RIDER_ABOVE_BOARD, pose.worldZ);
-  rider.rotation.set(pose.riderLean, pose.rotationY, pose.roll * 0.35);
+  rider.rotation.set(pose.roll * 0.35, pose.rotationY, pose.riderLean);
 }
 
 function flatMaterial(color: number, roughness = 0.9): MeshStandardMaterial {
@@ -190,6 +199,9 @@ export class EntityLayer {
       this.demoSurfer,
       this.demoSurferWake,
     );
+    for (const posed of [this.ridingBoard, this.player, this.demoSurferBoard, this.demoSurfer]) {
+      posed.rotation.order = 'YXZ';
+    }
 
     const wakeOuter = new Mesh(
       new CylinderGeometry(0.5, 0.5, 0.02, 16),

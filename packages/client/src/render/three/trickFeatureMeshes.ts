@@ -134,6 +134,7 @@ function makeMaterial(color: number, opacity: number): MeshStandardMaterial {
     opacity,
     roughness: 0.7,
     metalness: 0.1,
+    flatShading: true,
   });
 }
 
@@ -205,17 +206,28 @@ function buildRailGroup(
   alpha: number,
 ): Group {
   const group = new Group();
-  const rail = new Mesh(
-    new BoxGeometry(radius * 2.3, radius * 0.1, radius * 0.2),
-    makeMaterial(palette.base, alpha),
-  );
-  rail.position.y = radius * 0.22;
-  const post = new Mesh(
-    new BoxGeometry(radius * 0.32, radius * 0.4, radius * 0.32),
+  const barY = radius * 0.24;
+  const bar = new Mesh(
+    new BoxGeometry(radius * 2.3, radius * 0.08, radius * 0.12),
     makeMaterial(palette.accent, alpha),
   );
-  post.position.set(0, radius * 0.34, 0);
-  group.add(rail, post);
+  bar.position.y = barY;
+
+  for (const side of [-1, 1]) {
+    const post = new Mesh(
+      new BoxGeometry(radius * 0.14, barY, radius * 0.14),
+      makeMaterial(palette.base, alpha),
+    );
+    post.position.set(side * radius * 0.85, barY / 2, 0);
+    const foot = new Mesh(
+      new BoxGeometry(radius * 0.3, radius * 0.06, radius * 0.3),
+      makeMaterial(palette.base, alpha),
+    );
+    foot.position.set(side * radius * 0.85, radius * 0.03, 0);
+    group.add(post, foot);
+  }
+
+  group.add(bar);
   return group;
 }
 
@@ -229,8 +241,8 @@ function buildTunnelGroup(
     new TorusGeometry(
       radius * TUNNEL_TORUS_MAJOR_RADIUS_FACTOR,
       radius * TUNNEL_TORUS_TUBE_RADIUS_FACTOR,
-      14,
-      28,
+      6,
+      12,
       Math.PI,
     ),
     makeMaterial(palette.accent, alpha),
@@ -295,13 +307,19 @@ function buildBrainCoralGroup(
     new IcosahedronGeometry(radius * 0.55, 1),
     makeMaterial(palette.base, alpha),
   );
-  core.position.y = radius * 0.35;
+  core.position.y = radius * 0.32;
+  core.scale.y = 0.8;
   const bump = new Mesh(
     new IcosahedronGeometry(radius * 0.3, 0),
     makeMaterial(palette.accent, alpha),
   );
-  bump.position.set(radius * 0.25, radius * 0.5, radius * 0.15);
-  group.add(core, bump);
+  bump.position.set(radius * 0.25, radius * 0.48, radius * 0.15);
+  const bumpSmall = new Mesh(
+    new IcosahedronGeometry(radius * 0.2, 0),
+    makeMaterial(palette.accent, alpha),
+  );
+  bumpSmall.position.set(-radius * 0.28, radius * 0.42, -radius * 0.18);
+  group.add(core, bump, bumpSmall);
   return group;
 }
 
