@@ -10,26 +10,30 @@ export const CHAT_STONES_HEIGHT = 23;
 export const CHAT_HEIGHT = CHAT_MESSAGES_HEIGHT + CHAT_STONES_HEIGHT;
 export const CLIENT_GRID_HEIGHT = VIEWPORT_HEIGHT + CHAT_HEIGHT;
 
+/** All sidebar art is 249px wide, centered in the 253px sidebar column. */
+export const SIDEBAR_CONTENT_WIDTH = 249;
+export const SIDEBAR_CONTENT_LEFT = (SIDEBAR_WIDTH - SIDEBAR_CONTENT_WIDTH) / 2;
+
 export const MINIMAP_HEIGHT = 164;
 export const MINIMAP_LEFT_EDGE_WIDTH = 29;
 export const MINIMAP_RIGHT_EDGE_WIDTH = 48;
 export const MINIMAP_FRAME_WIDTH = 172;
 export const MINIMAP_FRAME_HEIGHT = 156;
 export const MINIMAP_BOTTOM_HEIGHT = 8;
-export const MINIMAP_FRAME_LEFT = MINIMAP_LEFT_EDGE_WIDTH;
+export const MINIMAP_FRAME_LEFT = SIDEBAR_CONTENT_LEFT + MINIMAP_LEFT_EDGE_WIDTH;
 export const MINIMAP_MAP_SIZE = 146;
 /** Map inset within the frame sprite (hole is shifted right for the compass lobe). */
 export const MINIMAP_MAP_INSET_X = 13;
 export const MINIMAP_MAP_TOP = 8;
 export const MINIMAP_MAP_LEFT = MINIMAP_FRAME_LEFT + MINIMAP_MAP_INSET_X;
-export const MINIMAP_COMPASS_LEFT = MINIMAP_FRAME_LEFT + 6;
-export const MINIMAP_COMPASS_TOP = 6;
-export const MINIMAP_COMPASS_SIZE = 28;
-export const MINIMAP_BOTTOM_WIDTH = 249;
-export const MINIMAP_BOTTOM_LEFT = (SIDEBAR_WIDTH - MINIMAP_BOTTOM_WIDTH) / 2;
+export const MINIMAP_COMPASS_LEFT = MINIMAP_FRAME_LEFT + 2;
+export const MINIMAP_COMPASS_TOP = 2;
+export const MINIMAP_COMPASS_SIZE = 32;
+export const MINIMAP_BOTTOM_WIDTH = SIDEBAR_CONTENT_WIDTH;
+export const MINIMAP_BOTTOM_LEFT = SIDEBAR_CONTENT_LEFT;
 
-export const TAB_STRIP_WIDTH = 249;
-export const TAB_STRIP_LEFT = (SIDEBAR_WIDTH - TAB_STRIP_WIDTH) / 2;
+export const TAB_STRIP_WIDTH = SIDEBAR_CONTENT_WIDTH;
+export const TAB_STRIP_LEFT = SIDEBAR_CONTENT_LEFT;
 export const TAB_BAR_HEIGHT = 37;
 export const TAB_BAR_ROWS = 2;
 export const TAB_SLOT_COUNT = 7;
@@ -40,9 +44,9 @@ export const INTERFACE_PANEL_HEIGHT = SIDEBAR_BODY_HEIGHT - TAB_BAR_HEIGHT * TAB
 export const SIDE_PANEL_EDGE_WIDTH = 26;
 export const SIDE_PANEL_WIDTH = 190;
 export const SIDE_PANEL_HEIGHT = INTERFACE_PANEL_HEIGHT;
-export const INTERFACE_ROW_WIDTH =
-  SIDE_PANEL_EDGE_WIDTH * 2 + SIDE_PANEL_WIDTH;
-export const INTERFACE_ROW_LEFT = (SIDEBAR_WIDTH - INTERFACE_ROW_WIDTH) / 2;
+export const INTERFACE_ROW_WIDTH = SIDE_PANEL_EDGE_WIDTH * 2 + SIDE_PANEL_WIDTH;
+export const INTERFACE_ROW_LEFT =
+  SIDEBAR_CONTENT_LEFT + Math.round((SIDEBAR_CONTENT_WIDTH - INTERFACE_ROW_WIDTH) / 2);
 
 /** Camera yaw (rad) when north is up on screen — used for compass snap. */
 export const CAMERA_YAW_NORTH = Math.PI / 2;
