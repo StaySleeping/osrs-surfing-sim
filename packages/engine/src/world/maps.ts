@@ -78,7 +78,7 @@ function buildTrickZones(map: WorldMap): TrickZone[] {
 
     const type = TRICK_FEATURE_TYPES[i % TRICK_FEATURE_TYPES.length];
     const counterRide = i % 5 === 0;
-    const rotation = trickZoneRotationRadians(positionAngle, counterRide, type);
+    const rotation = trickZoneRotationRadians(positionAngle, counterRide);
 
     zones.push({
       id: `${type}-${i}`,
