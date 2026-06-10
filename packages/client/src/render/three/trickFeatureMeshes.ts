@@ -262,8 +262,7 @@ function buildJumpRamp(
   const depth = run + overlap;
   const innerTopOffsetY = (thickness / 2) * Math.cos(angle) + (depth / 2) * Math.sin(angle);
   const centerY = peakY - innerTopOffsetY;
-  const centerZ =
-    -zSign * ((thickness / 2) * Math.sin(angle) - (depth / 2) * Math.cos(angle));
+  const centerZ = -zSign * ((thickness / 2) * Math.sin(angle) - (depth / 2) * Math.cos(angle));
 
   const ramp = new Mesh(
     new BoxGeometry(width, thickness, depth),
@@ -280,10 +279,7 @@ function buildJumpGroup(
   alpha: number,
 ): Group {
   const group = new Group();
-  group.add(
-    buildJumpRamp(radius, -1, palette, alpha),
-    buildJumpRamp(radius, 1, palette, alpha),
-  );
+  group.add(buildJumpRamp(radius, -1, palette, alpha), buildJumpRamp(radius, 1, palette, alpha));
   // Meshes are built along +Z; align with reef tangent (rails use +X).
   group.rotation.y = Math.PI / 2;
   return group;

@@ -12,8 +12,7 @@ const JUMP_HITBOX_ABOVE_SURFACE_HEIGHT = 0.08;
 
 function jumpHalfAlongRideFactor(): number {
   const waterCrossAlong =
-    (JUMP_RAMP_RUN * JUMP_RAMP_PEAK_HEIGHT) /
-    (JUMP_RAMP_PEAK_HEIGHT + JUMP_RAMP_LIP_BELOW_SURFACE);
+    (JUMP_RAMP_RUN * JUMP_RAMP_PEAK_HEIGHT) / (JUMP_RAMP_PEAK_HEIGHT + JUMP_RAMP_LIP_BELOW_SURFACE);
   return waterCrossAlong + JUMP_HITBOX_PAST_WATER_ALONG;
 }
 
@@ -30,13 +29,12 @@ const TUNNEL_HITBOX_MARGIN = 0.04;
  * Oriented hitbox half-extents as multiples of zone.radius.
  * Matches client mesh bounds in trickFeatureMeshes.ts (ride axis = local +X).
  */
-export const TRICK_HITBOX_HALF_ALONG_RIDE: Record<Exclude<TrickFeatureType, 'tunnel'>, number> =
-  {
-    rail: 1.15,
-    jump: jumpHalfAlongRideFactor(),
-    brain_coral: 0.8,
-    wall_ride: 0.675,
-  };
+export const TRICK_HITBOX_HALF_ALONG_RIDE: Record<Exclude<TrickFeatureType, 'tunnel'>, number> = {
+  rail: 1.15,
+  jump: jumpHalfAlongRideFactor(),
+  brain_coral: 0.8,
+  wall_ride: 0.675,
+};
 
 export const TRICK_HITBOX_HALF_LATERAL: Record<Exclude<TrickFeatureType, 'tunnel'>, number> = {
   rail: 0.16,
@@ -88,10 +86,7 @@ export interface TrickHitboxExtents {
   centerY: number;
 }
 
-export function trickZoneHitboxExtents(
-  type: TrickFeatureType,
-  radius: number,
-): TrickHitboxExtents {
+export function trickZoneHitboxExtents(type: TrickFeatureType, radius: number): TrickHitboxExtents {
   if (type === 'tunnel') {
     const factors = tunnelTrickHitboxFactors();
     return {
@@ -133,7 +128,5 @@ export function trickZoneLocalOffset(
 export function isPointInTrickZoneHitbox(zone: TrickZone, pos: WorldPos): boolean {
   const { halfAlongRide, halfLateral } = trickZoneHitboxExtents(zone.type, zone.radius);
   const local = trickZoneLocalOffset(zone, pos);
-  return (
-    Math.abs(local.alongRide) <= halfAlongRide && Math.abs(local.lateral) <= halfLateral
-  );
+  return Math.abs(local.alongRide) <= halfAlongRide && Math.abs(local.lateral) <= halfLateral;
 }
