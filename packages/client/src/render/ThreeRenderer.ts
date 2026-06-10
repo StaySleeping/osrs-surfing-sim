@@ -210,6 +210,10 @@ export class ThreeRenderer implements IRenderer {
     return this.orbitCamera?.getCompassRotationRadians() ?? 0;
   }
 
+  getViewFacingRadians(): number {
+    return this.orbitCamera?.getViewFacingRadians() ?? 0;
+  }
+
   snapCameraNorth(): void {
     this.orbitCamera?.snapNorth();
   }

@@ -287,6 +287,7 @@ export class OsrsClient {
     const beforeTick = this.simulation.getSnapshot();
     this.tidePhaseFrom = beforeTick.tide?.phaseRadians ?? null;
 
+    this.simulation.setCameraFacing(this.renderer.getViewFacingRadians());
     this.simulation.tick();
 
     const snapshot = this.simulation.getSnapshot();

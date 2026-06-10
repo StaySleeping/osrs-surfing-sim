@@ -49,7 +49,7 @@ describe('demoSurfer', () => {
 
   it('rides the reef loop without leaving surfable water', () => {
     const arena = createCoralParkSlice();
-    expect(arena.demoSurfers.length).toBeGreaterThanOrEqual(4);
+    expect(arena.demoSurfers.length).toBeGreaterThanOrEqual(5);
 
     const tide = createTideState(arena.tide!);
     let runtime = createDemoSurfer(arena.demoSurfers[0]);
@@ -77,6 +77,7 @@ describe('demoSurfer', () => {
       'Kai',
       'Hina',
       'Tama',
+      'Koa',
     ]);
     expect(snapshot.demoSurfers[0].surfboard.speedState).not.toBe('seated');
   });
@@ -132,6 +133,47 @@ describe('demoSurfer', () => {
 
     expect(visitedSweep).toBe(true);
     expect(maxTravel).toBeGreaterThan(80);
+  });
+
+  // Statistical behaviour over random layouts; retry rules out unlucky arenas.
+  it('keeps the show-off performing in front of the camera near the player', { retry: 2 }, () => {
+    const arena = createCoralParkSlice();
+    const sim = new GameSimulation({ arena });
+    const facing = Math.PI / 2;
+    sim.setCameraFacing(facing);
+
+    let inFrontTicks = 0;
+    let nearTicks = 0;
+    let tooCloseTicks = 0;
+    const WARMUP = 300;
+    const TOTAL = 1500;
+
+    for (let i = 0; i < TOTAL; i += 1) {
+      sim.tick();
+      if (i < WARMUP) {
+        continue;
+      }
+      const snap = sim.getSnapshot();
+      const koa = snap.demoSurfers.find((surfer) => surfer.name === 'Koa')!;
+      const player = snap.surfboard.position;
+      const dx = koa.surfboard.position.x - player.x;
+      const dy = koa.surfboard.position.y - player.y;
+      const dist = Math.hypot(dx, dy);
+      if (Math.cos(facing) * dx + Math.sin(facing) * dy > 0) {
+        inFrontTicks += 1;
+      }
+      if (dist < 60) {
+        nearTicks += 1;
+      }
+      if (dist < 3) {
+        tooCloseTicks += 1;
+      }
+    }
+
+    const sampled = TOTAL - WARMUP;
+    expect(inFrontTicks / sampled).toBeGreaterThan(0.6);
+    expect(nearTicks / sampled).toBeGreaterThan(0.6);
+    expect(tooCloseTicks / sampled).toBeLessThan(0.02);
   });
 
   it('rides clockwise and performs trick animations without affecting player progression', () => {

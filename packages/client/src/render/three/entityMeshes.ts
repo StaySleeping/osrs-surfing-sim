@@ -44,6 +44,7 @@ const DEMO_SURFER_STYLES: DemoSurferStyle[] = [
   { shirt: 0x8a2d4e, hair: 0x1c120c, boardWood: 0xc9a066, boardStripe: 0x66c2e8 },
   { shirt: 0x6a5fb5, hair: 0x3a2a18, boardWood: 0x9a7a4a, boardStripe: 0xf4a7b9 },
   { shirt: 0xc2a23c, hair: 0x241a10, boardWood: 0xb8884a, boardStripe: 0x8fe07a },
+  { shirt: 0xe05038, hair: 0x14100c, boardWood: 0xf2ead8, boardStripe: 0xe04848 },
 ];
 
 const RIDER_ABOVE_BOARD = 0.05;

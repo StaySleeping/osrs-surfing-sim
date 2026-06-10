@@ -68,6 +68,18 @@ export const DEMO_SURFER_ZONE_PRIME_DISTANCE = 12;
 /** Polar angle step (radians) when scouting the next point along the reef loop. */
 export const DEMO_SURFER_AHEAD_ANGLE_STEP = 0.18;
 
+/** Show-off tuning: hold this far in front of the camera, clear of the player. */
+export const SHOWOFF_FOLLOW_DISTANCE = 16;
+export const SHOWOFF_MIN_PLAYER_DISTANCE = 7;
+/** Hunt features inside this view cone from the camera (radians half-angle). */
+export const SHOWOFF_VIEW_CONE_RADIANS = 0.7;
+/** Only chase features this close to the audience so tricks happen on screen. */
+export const SHOWOFF_TRICK_RANGE = 40;
+/** Within this range of the anchor the show-off carves circles instead. */
+export const SHOWOFF_CARVE_RADIUS = 5;
+/** Heading steps per tick while carving a circle (16 steps = full turn). */
+export const SHOWOFF_CARVE_HEADING_STEP = 2;
+
 /** Explorer wander tuning. */
 export const EXPLORER_TARGET_REACHED_DISTANCE = 4;
 export const EXPLORER_RIDE_DISTANCE = 18;
@@ -92,7 +104,15 @@ export type DemoSurferBehavior =
       ringDepth: number;
       doesTricks: boolean;
     }
-  | { kind: 'explorer' };
+  | { kind: 'explorer' }
+  | { kind: 'showoff'; followDistance: number };
+
+/** Player position and camera view direction the show-off performs for. */
+export interface ShowoffAudience {
+  x: number;
+  y: number;
+  facingRadians: number;
+}
 
 export const DEFAULT_DEMO_SURFER_BEHAVIOR: DemoSurferBehavior = {
   kind: 'loop',
@@ -155,6 +175,7 @@ export interface DemoSurferAiContext {
   map: WorldMap;
   behavior?: DemoSurferBehavior;
   aiState?: DemoSurferAiState;
+  audience?: ShowoffAudience | null;
 }
 
 export interface DemoSurferAiResult {
@@ -563,7 +584,7 @@ function computeExplorerAi(
 
 function computeReefRiderAi(
   context: DemoSurferAiContext,
-  behavior: Exclude<DemoSurferBehavior, { kind: 'explorer' }>,
+  behavior: Extract<DemoSurferBehavior, { kind: 'loop' | 'sector' }>,
   aiState: DemoSurferAiState,
 ): DemoSurferAiInput {
   const { surfboard, trickPrepare, trickZones, tide } = context;
@@ -629,6 +650,150 @@ function computeReefRiderAi(
   return input;
 }
 
+/** First sailable spot ahead of the camera, swept further out then sideways. */
+function showoffAnchor(map: WorldMap, audience: ShowoffAudience, followDistance: number): WorldPos {
+  for (const angleOffset of [0, 0.5, -0.5, 1, -1]) {
+    const facing = audience.facingRadians + angleOffset;
+    for (const distanceShare of [1, 1.4, 2, 2.8]) {
+      const x = audience.x + Math.cos(facing) * followDistance * distanceShare;
+      const y = audience.y + Math.sin(facing) * followDistance * distanceShare;
+      if (isWorldPointSailingTarget(map, x, y)) {
+        return { x, y };
+      }
+    }
+  }
+  return idealReefPoint(polarFromIsland(audience.x, audience.y).angle);
+}
+
+/** Nearest untricked, exposed feature inside the camera's view cone. */
+function selectShowoffZone(
+  position: WorldPos,
+  audience: ShowoffAudience,
+  trickZones: TrickZone[],
+  tide: TideState | null,
+): TrickZone | null {
+  let best: TrickZone | null = null;
+  let bestDist = Infinity;
+
+  for (const zone of trickZones) {
+    if (zone.tricked) {
+      continue;
+    }
+    if (tide && isTrickZoneSubmerged(zone, tide)) {
+      continue;
+    }
+    const toZone = Math.atan2(zone.center.y - audience.y, zone.center.x - audience.x);
+    if (Math.abs(signedAngleDelta(audience.facingRadians, toZone)) > SHOWOFF_VIEW_CONE_RADIANS) {
+      continue;
+    }
+    const audienceDist = Math.hypot(zone.center.x - audience.x, zone.center.y - audience.y);
+    if (audienceDist > SHOWOFF_TRICK_RANGE) {
+      continue;
+    }
+    const dist = Math.hypot(zone.center.x - position.x, zone.center.y - position.y);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = zone;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Heading toward a target, detouring along the reef ring when the straight
+ * line is blocked by the island.
+ */
+function showoffSteerHeading(
+  map: WorldMap,
+  tide: TideState | null,
+  position: WorldPos,
+  target: WorldPos,
+): HeadingIndex {
+  if (isWanderPathClear(map, position, target)) {
+    return snapAngleToHeading(Math.atan2(target.y - position.y, target.x - position.x));
+  }
+  const myAngle = polarFromIsland(position.x, position.y).angle;
+  const targetAngle = polarFromIsland(target.x, target.y).angle;
+  const direction = signedAngleDelta(myAngle, targetAngle) >= 0 ? 1 : -1;
+  const ahead = idealReefPoint(myAngle + direction * DEMO_SURFER_AHEAD_ANGLE_STEP * 1.5, tide);
+  return snapAngleToHeading(Math.atan2(ahead.y - position.y, ahead.x - position.x));
+}
+
+/** Performs in front of the camera: chases on-screen features, carves while idle. */
+function computeShowoffAi(
+  context: DemoSurferAiContext,
+  behavior: Extract<DemoSurferBehavior, { kind: 'showoff' }>,
+  aiState: DemoSurferAiState,
+): DemoSurferAiInput {
+  const { surfboard, trickPrepare, trickZones, tide, map, audience } = context;
+  const position = surfboard.position;
+
+  if (!audience) {
+    const angle = polarFromIsland(position.x, position.y).angle;
+    const ideal = idealReefPoint(angle + DEMO_SURFER_AHEAD_ANGLE_STEP, tide);
+    return {
+      standUp: true,
+      setIntendedHeading: courseHeading(position, ideal.x, ideal.y, tide),
+    };
+  }
+
+  if (tide && isPointInTideSweep(position.x, position.y, tide)) {
+    // Caught by the swell: ride it out counter-clockwise — against the sweep
+    // direction is the fastest exit back to the dry reef.
+    const escape =
+      reefRideClockwiseRadians(polarFromIsland(position.x, position.y).angle) + Math.PI;
+    return { standUp: true, setIntendedHeading: snapAngleToHeading(escape) };
+  }
+
+  const playerDistance = Math.hypot(position.x - audience.x, position.y - audience.y);
+  if (playerDistance < SHOWOFF_MIN_PLAYER_DISTANCE) {
+    const away = snapAngleToHeading(Math.atan2(position.y - audience.y, position.x - audience.x));
+    return { standUp: true, setIntendedHeading: away };
+  }
+
+  // Steering straight at the anchor can wedge against the beach; break out radially.
+  const last = aiState.lastPosition;
+  const moved = !last || Math.hypot(position.x - last.x, position.y - last.y) > 0.01;
+  aiState.lastPosition = { ...position };
+  aiState.stuckTicks = moved ? 0 : aiState.stuckTicks + 1;
+  if (aiState.stuckTicks > EXPLORER_STUCK_TICK_LIMIT) {
+    aiState.stuckTicks = 0;
+    const outward = snapAngleToHeading(polarFromIsland(position.x, position.y).angle);
+    return { standUp: true, setIntendedHeading: outward };
+  }
+
+  const targetZone = selectShowoffZone(position, audience, trickZones, tide);
+  if (targetZone) {
+    const steer = steerTowardZone(position, targetZone);
+    const input: DemoSurferAiInput = {
+      standUp: true,
+      setIntendedHeading: showoffSteerHeading(map, tide, position, {
+        x: steer.steerX,
+        y: steer.steerY,
+      }),
+    };
+    const primeSlot = shouldPrimeTrick(position, targetZone, trickPrepare, true);
+    if (primeSlot !== undefined) {
+      input.prepareSlot = primeSlot;
+    }
+    return input;
+  }
+
+  const anchor = showoffAnchor(map, audience, behavior.followDistance);
+  const anchorDistance = Math.hypot(anchor.x - position.x, anchor.y - position.y);
+  if (anchorDistance < SHOWOFF_CARVE_RADIUS) {
+    const carve =
+      (surfboard.currentHeading + SHOWOFF_CARVE_HEADING_STEP + HEADING_COUNT) % HEADING_COUNT;
+    return { standUp: true, setIntendedHeading: carve };
+  }
+
+  return {
+    standUp: true,
+    setIntendedHeading: showoffSteerHeading(map, tide, position, anchor),
+  };
+}
+
 export function computeDemoSurferAi(context: DemoSurferAiContext): DemoSurferAiResult {
   const behavior = context.behavior ?? DEFAULT_DEMO_SURFER_BEHAVIOR;
   const aiState = { ...(context.aiState ?? createDemoSurferAiState(1)) };
@@ -649,7 +814,9 @@ export function computeDemoSurferAi(context: DemoSurferAiContext): DemoSurferAiR
   const input =
     behavior.kind === 'explorer'
       ? computeExplorerAi(context, aiState)
-      : computeReefRiderAi(context, behavior, aiState);
+      : behavior.kind === 'showoff'
+        ? computeShowoffAi(context, behavior, aiState)
+        : computeReefRiderAi(context, behavior, aiState);
   return { input, aiState };
 }
 

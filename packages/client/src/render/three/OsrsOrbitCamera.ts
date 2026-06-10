@@ -175,6 +175,11 @@ export class OsrsOrbitCamera {
     return CAMERA_YAW_NORTH - this.yaw;
   }
 
+  /** Horizontal view direction in engine tile space (camera looks toward the focus). */
+  getViewFacingRadians(): number {
+    return this.yaw + Math.PI;
+  }
+
   snapNorth(): void {
     this.yaw = CAMERA_YAW_NORTH;
   }
