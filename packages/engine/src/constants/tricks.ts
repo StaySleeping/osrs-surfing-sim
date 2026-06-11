@@ -6,7 +6,7 @@ export type TrickPrepareSlot = 0 | 1 | 2;
 
 export const TRICK_PREPARE_SLOT_COUNT = 3;
 
-export const TRICK_STANCE_NAMES = ['Low', 'Medium', 'High'] as const;
+export const TRICK_STANCE_NAMES = ['Grind', 'Tuck', 'Air'] as const;
 
 export type TrickStanceName = (typeof TRICK_STANCE_NAMES)[number];
 
