@@ -36,6 +36,9 @@ export const TRICK_HITBOX_HALF_ALONG_RIDE: Record<Exclude<TrickFeatureType, 'tun
   wall_ride: 0.675,
 };
 
+/** Max distance from the rail ride segment to register a trick entry (× zone.radius). */
+export const RAIL_TRICK_PROXIMITY_FACTOR = 0.45;
+
 export const TRICK_HITBOX_HALF_LATERAL: Record<Exclude<TrickFeatureType, 'tunnel'>, number> = {
   rail: 0.16,
   jump: JUMP_RAMP_WIDTH / 2,
@@ -108,6 +111,9 @@ export function trickZoneHitboxExtents(type: TrickFeatureType, radius: number): 
 /** Conservative outer reach for distance-based steering and approach checks. */
 export function trickZoneHitboxReach(zone: Pick<TrickZone, 'type' | 'radius'>): number {
   const extents = trickZoneHitboxExtents(zone.type, zone.radius);
+  if (zone.type === 'rail') {
+    return Math.max(extents.halfAlongRide, railTrickProximityDistance(zone.radius));
+  }
   return Math.max(extents.halfAlongRide, extents.halfLateral);
 }
 
@@ -125,7 +131,30 @@ export function trickZoneLocalOffset(
   };
 }
 
+export function railTrickProximityDistance(radius: number): number {
+  return radius * RAIL_TRICK_PROXIMITY_FACTOR;
+}
+
+function distanceToRideSegment(
+  zone: Pick<TrickZone, 'center' | 'rotationRadians'>,
+  pos: WorldPos,
+  halfAlongRide: number,
+): number {
+  const local = trickZoneLocalOffset(zone, pos);
+  const clampedAlong = Math.max(-halfAlongRide, Math.min(halfAlongRide, local.alongRide));
+  return Math.hypot(local.alongRide - clampedAlong, local.lateral);
+}
+
+function isPointNearRailRideSegment(zone: TrickZone, pos: WorldPos): boolean {
+  const { halfAlongRide } = trickZoneHitboxExtents('rail', zone.radius);
+  return distanceToRideSegment(zone, pos, halfAlongRide) <= railTrickProximityDistance(zone.radius);
+}
+
 export function isPointInTrickZoneHitbox(zone: TrickZone, pos: WorldPos): boolean {
+  if (zone.type === 'rail') {
+    return isPointNearRailRideSegment(zone, pos);
+  }
+
   const { halfAlongRide, halfLateral } = trickZoneHitboxExtents(zone.type, zone.radius);
   const local = trickZoneLocalOffset(zone, pos);
   return Math.abs(local.alongRide) <= halfAlongRide && Math.abs(local.lateral) <= halfLateral;
