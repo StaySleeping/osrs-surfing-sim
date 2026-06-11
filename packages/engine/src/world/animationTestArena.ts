@@ -9,14 +9,15 @@ import type { TrickFeatureType, TrickZone } from './features.js';
  * flat open water, no tide, no NPCs or demo surfers, and one zone per
  * feature type on a fixed east-facing row so approaches are reproducible.
  */
-export const ANIMATION_TEST_MAP_WIDTH = 120;
+export const ANIMATION_TEST_MAP_WIDTH = 200;
 export const ANIMATION_TEST_MAP_HEIGHT = 64;
 
 /** Row of zones riding due east (rotation 0). */
 export const ANIMATION_TEST_ALIGNED_ROW_Y = 26;
 /** Row of counter-rotated zones (axis faces west) to exercise wrong-way entries. */
 export const ANIMATION_TEST_COUNTER_ROW_Y = 44;
-export const ANIMATION_TEST_ZONE_SPACING = 18;
+/** Wide enough that a trick exit stays west of the next zone's staging point. */
+export const ANIMATION_TEST_ZONE_SPACING = 36;
 export const ANIMATION_TEST_FIRST_ZONE_X = 28;
 
 export const ANIMATION_TEST_ZONE_TYPES: TrickFeatureType[] = [

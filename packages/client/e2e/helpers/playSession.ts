@@ -732,6 +732,42 @@ export async function runCoralParkPlaytest(
   expect((await getSnapshot(page)).progression.session.tricksLanded).toBeGreaterThanOrEqual(3);
 }
 
+/** Prime with a frozen tick, then ride east along the zone row through a feature. */
+export async function rideEastboundTrick(
+  page: Page,
+  zone: TrickZone,
+  mapWidth: number,
+): Promise<void> {
+  const before = (await getSnapshot(page)).progression.session.tricksLanded;
+  const aimX = Math.min(mapWidth - 3, zone.center.x + 30);
+
+  await withPausedSimulation(page, async () => {
+    await clearTrickPrepare(page);
+    await setSpeedState(page, 'riding');
+    await rideNearZoneForPrepare(page, zone);
+    await prepareTrick(page, zone.prepareSlot);
+    await advanceTicksHoldOutsideZone(page, zone, TRICK_BAIL_PRIME_TICKS_BEFORE_ENTRY);
+
+    for (let i = 0; i < 80; i += 1) {
+      const snap = await getSnapshot(page);
+      if (snap.surfboard.speedState !== 'riding' && !snap.trickAnimation) {
+        await setSpeedState(page, 'riding');
+      }
+      if (!snap.trickAnimation) {
+        await clickWorld(page, aimX, zone.center.y);
+      }
+      await advanceTicks(page, 1);
+
+      const after = await getSnapshot(page);
+      if (after.progression.session.tricksLanded > before && !after.trickAnimation) {
+        return;
+      }
+    }
+
+    throw new Error(`Failed to land trick on ${zone.id}`);
+  });
+}
+
 /** @deprecated Use runCoralParkPlaytest */
 export async function runCoralParkPlaythrough(
   page: Page,

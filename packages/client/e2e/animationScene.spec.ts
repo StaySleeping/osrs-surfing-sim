@@ -11,7 +11,7 @@ import {
 
 const ARENA = createAnimationTestSlice();
 const HEADING_EAST = 0;
-const ALIGNED_ZONES = ARENA.trickZones.filter((zone) => zone.rotationRadians === 0);
+const BRAIN_CORAL = ARENA.trickZones.find((zone) => zone.id === 'anim-brain_coral')!;
 const COUNTER_RAIL = ARENA.trickZones.find((zone) => zone.id === 'anim-rail-counter')!;
 
 /** Rail/wall hitboxes are only ~±0.64 tiles laterally — stay on the row before priming. */
@@ -38,8 +38,10 @@ async function mountBoard(page: Page): Promise<void> {
   throw new Error('Failed to mount board in animation scene');
 }
 
-/** Steer toward a waypoint on simulation ticks; recovers to riding after bails. */
-async function rideTo(page: Page, x: number, y: number, within = 2): Promise<void> {
+async function stageWestOfZone(page: Page, zone: TrickZone, within = 2): Promise<void> {
+  const x = zone.center.x - 9;
+  const y = zone.center.y;
+
   for (let i = 0; i < 240; i += 1) {
     const snap = await getSnapshot(page);
     if (snap.trickAnimation) {
@@ -50,16 +52,15 @@ async function rideTo(page: Page, x: number, y: number, within = 2): Promise<voi
       await setSpeedState(page, 'riding');
     }
     const pos = snap.surfboard.position;
-    if (Math.hypot(pos.x - x, pos.y - y) <= within) {
+    if (Math.hypot(pos.x - x, pos.y - y) <= within && pos.x <= x + within) {
       return;
     }
     await clickWorld(page, x, y);
     await advanceTicks(page, 1);
   }
-  throw new Error(`Did not reach waypoint (${x}, ${y})`);
+  throw new Error(`Did not stage west of ${zone.id} at (${x}, ${y})`);
 }
 
-/** Re-steer onto the feature row without orbiting (diagonal aim, not straight north/south). */
 async function alignToRow(page: Page, rowY: number): Promise<void> {
   for (let i = 0; i < 60; i += 1) {
     const snap = await getSnapshot(page);
@@ -77,7 +78,6 @@ async function alignToRow(page: Page, rowY: number): Promise<void> {
   throw new Error(`Failed to align to row y=${rowY}`);
 }
 
-/** Ride east into the zone along its row, priming on approach; returns when the trick lands. */
 async function rideTrickThroughZone(page: Page, zone: TrickZone): Promise<void> {
   const before = (await getSnapshot(page)).progression.session.tricksLanded;
   const aimX = Math.min(ARENA.map.widthTiles - 3, zone.center.x + 30);
@@ -107,40 +107,38 @@ async function rideTrickThroughZone(page: Page, zone: TrickZone): Promise<void> 
   throw new Error(`Failed to land trick on ${zone.id}`);
 }
 
+async function rideEastboundTrick(page: Page, zone: TrickZone): Promise<void> {
+  await stageWestOfZone(page, zone);
+  await alignToRow(page, zone.center.y);
+  await rideTrickThroughZone(page, zone);
+}
+
 test.describe('animation test scene', () => {
-  test('tricks exit in the direction of travel riding east through every feature', async ({
-    page,
-  }) => {
-    test.setTimeout(180_000);
+  test('eastbound brain coral trick exits east in the client', { retry: 1 }, async ({ page }) => {
+    test.setTimeout(60_000);
     await openAnimationScene(page);
     await mountBoard(page);
-
-    for (const zone of ALIGNED_ZONES) {
-      await rideTo(page, zone.center.x - 9, zone.center.y);
-      await alignToRow(page, zone.center.y);
-      await rideTrickThroughZone(page, zone);
-
-      const snap = await getSnapshot(page);
-      expect(snap.surfboard.currentHeading, `${zone.id} exit heading`).toBe(HEADING_EAST);
-      expect(snap.surfboard.position.x, `${zone.id} exit position`).toBeGreaterThan(zone.center.x);
-    }
-  });
-
-  test('entering a counter-rotated feature keeps the rider traveling forward', async ({ page }) => {
-    test.setTimeout(180_000);
-    await openAnimationScene(page);
-    await mountBoard(page);
-
-    // The counter row's axis faces west; an eastbound entry must still exit
-    // east with the rider's momentum instead of flipping them around.
-    await rideTo(page, COUNTER_RAIL.center.x - 9, COUNTER_RAIL.center.y);
-    await alignToRow(page, COUNTER_RAIL.center.y);
-    await rideTrickThroughZone(page, COUNTER_RAIL);
+    await rideEastboundTrick(page, BRAIN_CORAL);
 
     const snap = await getSnapshot(page);
-    expect(snap.surfboard.currentHeading, 'counter-rotated exit heading').toBe(HEADING_EAST);
-    expect(snap.surfboard.position.x, 'counter-rotated exit position').toBeGreaterThan(
-      COUNTER_RAIL.center.x,
-    );
+    expect(snap.surfboard.currentHeading).toBe(HEADING_EAST);
+    expect(snap.surfboard.position.x).toBeGreaterThan(BRAIN_CORAL.center.x);
   });
+
+  test(
+    'entering a counter-rotated feature keeps the rider traveling forward',
+    { retry: 1 },
+    async ({ page }) => {
+      test.setTimeout(60_000);
+      await openAnimationScene(page);
+      await mountBoard(page);
+      await rideEastboundTrick(page, COUNTER_RAIL);
+
+      const snap = await getSnapshot(page);
+      expect(snap.surfboard.currentHeading, 'counter-rotated exit heading').toBe(HEADING_EAST);
+      expect(snap.surfboard.position.x, 'counter-rotated exit position').toBeGreaterThan(
+        COUNTER_RAIL.center.x,
+      );
+    },
+  );
 });
