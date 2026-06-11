@@ -14,6 +14,12 @@ const OSRS_CSS_BACKGROUNDS: Record<string, string> = {
   '--osrs-url-side-panel': 'fixed_mode/side_panel_background.png',
   '--osrs-url-side-panel-edge-left': 'side_panel_edge_left.png',
   '--osrs-url-side-panel-edge-right': 'side_panel_edge_right.png',
+  '--osrs-url-stone-btn': 'button/stone_button_9slice.png',
+  '--osrs-url-stone-btn-hovered': 'button/stone_button_9slice_hovered.png',
+  '--osrs-url-stone-btn-disabled': 'button/stone_button_9slice_disabled.png',
+  '--osrs-url-stone-tab': 'chatbox/button.png',
+  '--osrs-url-stone-tab-hovered': 'chatbox/button_hovered.png',
+  '--osrs-url-stone-tab-selected': 'chatbox/button_selected.png',
 };
 
 export function injectOsrsAssetUrls(): void {
