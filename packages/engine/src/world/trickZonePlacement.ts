@@ -26,7 +26,7 @@ export const TRICK_FEATURE_TYPES: TrickFeatureType[] = [
   'wall_ride',
 ];
 
-/** Low = grind, Medium = tunnel/wall ride, High = jump. */
+/** Grind = rail/brain coral, Tuck = tunnel/wall ride, Air = jump. */
 export const TRICK_TYPE_TO_PREPARE_SLOT: Record<TrickFeatureType, TrickPrepareSlot> = {
   rail: 0,
   brain_coral: 0,

@@ -26,7 +26,7 @@ import {
   isNearNpc,
   type NpcDefinition,
 } from '../world/npc.js';
-import type { TrickPrepareSlot } from '../constants/tricks.js';
+import { trickStanceName, type TrickPrepareSlot } from '../constants/tricks.js';
 import {
   advanceTrickPrepare,
   advanceTrickZoneTideVisuals,
@@ -479,7 +479,8 @@ export class GameSimulation {
       isRotating: false,
     };
     this.pendingDialogue.push(
-      reason ?? `Bailed on the ${zone.type}! Prime the trick 1–4 ticks before you hit it.`,
+      reason ??
+        `Bailed on the ${zone.type}! Prime ${trickStanceName(zone.prepareSlot)} 1–4 ticks before you hit it.`,
     );
   }
 
