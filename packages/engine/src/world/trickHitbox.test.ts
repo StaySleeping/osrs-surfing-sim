@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { TrickZone } from './features.js';
 import {
   isPointInTrickZoneHitbox,
+  railTrickProximityDistance,
   trickZoneHitboxExtents,
   tunnelTrickHitboxFactors,
 } from './trickHitbox.js';
@@ -20,16 +21,25 @@ function railZone(rotationRadians = 0): TrickZone {
 }
 
 describe('trickZoneHitbox', () => {
-  it('uses a tight oriented box for rails instead of the full zone circle', () => {
+  it('uses ride-segment proximity for rails instead of the full zone circle', () => {
     const zone = railZone();
     const { halfAlongRide, halfLateral } = trickZoneHitboxExtents('rail', zone.radius);
+    const proximity = railTrickProximityDistance(zone.radius);
 
     expect(halfAlongRide).toBeCloseTo(4.6);
     expect(halfLateral).toBeCloseTo(0.64);
+    expect(proximity).toBeCloseTo(1.8);
     expect(isPointInTrickZoneHitbox(zone, { x: 10 + halfAlongRide - 0.1, y: 10 })).toBe(true);
-    expect(isPointInTrickZoneHitbox(zone, { x: 10 + halfAlongRide + 0.5, y: 10 })).toBe(false);
-    expect(isPointInTrickZoneHitbox(zone, { x: 10, y: 10 + halfLateral - 0.05 })).toBe(true);
+    expect(isPointInTrickZoneHitbox(zone, { x: 10, y: 10 + proximity - 0.1 })).toBe(true);
+    expect(isPointInTrickZoneHitbox(zone, { x: 10, y: 10 + proximity + 0.2 })).toBe(false);
     expect(isPointInTrickZoneHitbox(zone, { x: 10, y: 10 + zone.radius })).toBe(false);
+    // Near the bar end, offset laterally — still within proximity of the endpoint.
+    expect(
+      isPointInTrickZoneHitbox(zone, {
+        x: 10 + halfAlongRide + 0.3,
+        y: 10 + proximity * 0.5,
+      }),
+    ).toBe(true);
   });
 
   it('rotates the hitbox with the feature ride axis', () => {
