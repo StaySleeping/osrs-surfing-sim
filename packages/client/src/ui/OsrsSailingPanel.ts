@@ -72,13 +72,15 @@ type PanelTab = 'board' | 'stats' | 'rewards';
 function navButtonConfig(state: SpeedState, button: NavButtonId): NavButtonConfig {
   const a = OSRS_ASSETS;
   switch (button) {
-    case 'toggle-full':
+    case 'toggle-full': {
+      const moving = state !== 'seated';
       return {
-        icon: state === 'riding' ? a.surf.boardPlanted : a.surf.ride,
-        title: state === 'riding' ? 'Stop' : 'Full speed ahead',
+        icon: moving ? a.surf.boardPlanted : a.surf.ride,
+        title: moving ? 'Stop' : 'Full speed ahead',
         disabled: false,
-        targetState: state === 'riding' ? 'seated' : 'riding',
+        targetState: moving ? 'seated' : 'riding',
       };
+    }
     case 'speed-down':
       if (state === 'riding') {
         return {
