@@ -82,7 +82,7 @@ export const SHOWOFF_CARVE_HEADING_STEP = 2;
 
 /** Explorer wander tuning. */
 export const EXPLORER_TARGET_REACHED_DISTANCE = 4;
-export const EXPLORER_RIDE_DISTANCE = 18;
+export const EXPLORER_RIDE_DISTANCE = 9;
 export const EXPLORER_LOUNGE_CHANCE = 0.3;
 export const EXPLORER_LOUNGE_MIN_TICKS = 25;
 export const EXPLORER_LOUNGE_SPAN_TICKS = 30;

@@ -63,7 +63,7 @@ export interface GameArena {
   demoSurfers: DemoSurferConfig[];
 }
 
-export const CORAL_PARK_TRICK_ZONE_COUNT = 28;
+export const CORAL_PARK_TRICK_ZONE_COUNT = 14;
 
 function buildTrickZones(map: WorldMap): TrickZone[] {
   const zones: TrickZone[] = [];
@@ -229,7 +229,9 @@ export function createCoralParkSlice(): GameArena {
       innerRadiusAtAngle: coralParkReefInnerRadius,
       outerRadiusAtAngle: coralParkReefOuterRadius,
       sweepRadians: Math.PI / 1.35,
-      advancePerTick: 0.022,
+      // Angular speed scales inversely with reef radius so the wave's linear
+      // pace stays just under board ride speed; retune if the island resizes.
+      advancePerTick: 0.044,
     },
     npcs: [
       {

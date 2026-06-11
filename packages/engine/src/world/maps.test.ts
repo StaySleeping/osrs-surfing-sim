@@ -100,7 +100,7 @@ describe('createCoralParkSlice', () => {
       expect(mapTile(arena.map, surfer.startX, surfer.startY)).toBe('coral_rideable');
     }
     expect(arena.trickZones.length).toBeGreaterThanOrEqual(12);
-    expect(arena.map.widthTiles).toBeGreaterThanOrEqual(560);
+    expect(arena.map.widthTiles).toBeGreaterThanOrEqual(280);
 
     const minGap = minTrickZoneGap(arena.trickZones);
     expect(minGap).toBeGreaterThan(8);

@@ -1,32 +1,32 @@
-export const CORAL_PARK_MAP_WIDTH = 560;
-export const CORAL_PARK_MAP_HEIGHT = 448;
+export const CORAL_PARK_MAP_WIDTH = 280;
+export const CORAL_PARK_MAP_HEIGHT = 224;
 export const CORAL_PARK_ISLAND_CX = CORAL_PARK_MAP_WIDTH / 2;
 export const CORAL_PARK_ISLAND_CY = CORAL_PARK_MAP_HEIGHT / 2;
 
-const GRASS_BASE = 40;
-const SAND_BASE = 52;
-const SHALLOW_BASE = 60;
-const REEF_INNER_BASE = 66;
-const REEF_OUTER_BASE = 120;
+const GRASS_BASE = 20;
+const SAND_BASE = 26;
+const SHALLOW_BASE = 30;
+const REEF_INNER_BASE = 33;
+const REEF_OUTER_BASE = 60;
 
-const GRASS_WOBBLE = 16;
-const SAND_WOBBLE = 16.5;
-const SHALLOW_WOBBLE = 17;
-const REEF_INNER_WOBBLE = 17.5;
-const REEF_OUTER_WOBBLE = 14;
+const GRASS_WOBBLE = 8;
+const SAND_WOBBLE = 8.25;
+const SHALLOW_WOBBLE = 8.5;
+const REEF_INNER_WOBBLE = 8.75;
+const REEF_OUTER_WOBBLE = 7;
 
 /** Deep bay carved into the north-east coast (radians / tiles). */
 const BAY_ANGLE = -0.9;
 const BAY_WIDTH = 0.55;
-const BAY_DEPTH = 16;
+const BAY_DEPTH = 8;
 
 /** Long headland pointing south-west. */
 const HEADLAND_ANGLE = 2.3;
 const HEADLAND_WIDTH = 0.45;
-const HEADLAND_GAIN = 8;
+const HEADLAND_GAIN = 4;
 
 /** Keep a usable island core even where the bay and harmonics align. */
-const MIN_GRASS_RADIUS = 14;
+const MIN_GRASS_RADIUS = 7;
 
 function angularFalloff(angle: number, center: number, width: number): number {
   let delta = angle - center;
@@ -117,7 +117,7 @@ export const CORAL_PARK_SAND_OUTER_SURFACE_Y = 0.1;
 export const CORAL_PARK_GRASS_EDGE_SURFACE_Y = 0.25;
 
 /** Island summit at the map centre (world Y). */
-export const CORAL_PARK_GRASS_PEAK_SURFACE_Y = 3.6;
+export const CORAL_PARK_GRASS_PEAK_SURFACE_Y = 1.8;
 
 /** Cache-bust key for land mesh rebuilds when the knobs above change. */
 export function coralParkLandElevationKey(): string {
