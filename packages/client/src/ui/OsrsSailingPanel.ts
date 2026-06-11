@@ -64,6 +64,7 @@ export interface OsrsSailingPanelCallbacks {
   onSpeedState: (state: SpeedState) => void;
   onOpenShop: () => void;
   onPrepareTrick: (slot: TrickPrepareSlot) => void;
+  onToggleTrueTile: (enabled: boolean) => void;
 }
 
 type PanelTab = 'board' | 'stats' | 'rewards';
@@ -259,6 +260,10 @@ export class OsrsSailingPanel {
             ${STANCE_BUTTONS.map((stance) => this.renderStanceButton(stance)).join('')}
           </div>
           <p class="osrs-panel-footnote">Prime 1–4 ticks before the feature</p>
+          <label class="osrs-check-row" title="Highlight the tile your character is actually on">
+            <input type="checkbox" id="true-tile-toggle" />
+            <span>True tile marker</span>
+          </label>
         </div>
         <div class="osrs-tab-body" data-panel="stats">
           <p class="osrs-panel-section-title">Session</p>
@@ -323,6 +328,9 @@ export class OsrsSailingPanel {
     });
     this.root.querySelector('#shop-btn')?.addEventListener('click', () => {
       this.callbacks.onOpenShop();
+    });
+    this.root.querySelector('#true-tile-toggle')?.addEventListener('change', (event) => {
+      this.callbacks.onToggleTrueTile((event.target as HTMLInputElement).checked);
     });
   }
 

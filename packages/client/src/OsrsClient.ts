@@ -173,6 +173,7 @@ export class OsrsClient {
         shopPanel.update(simulation.getSnapshot().progression);
       },
       onPrepareTrick: (slot) => simulation.prepareTrick(slot),
+      onToggleTrueTile: (enabled) => renderer.setTrueTileVisible(enabled),
     });
     panelRefs.sailing = sailingPanel;
 

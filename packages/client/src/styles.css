@@ -471,6 +471,24 @@ body,
   text-shadow: 1px 1px 0 #000;
 }
 
+.osrs-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #000;
+  cursor: pointer;
+}
+
+.osrs-check-row input {
+  margin: 0;
+  accent-color: #00c8b4;
+  cursor: pointer;
+}
+
 .osrs-section-label {
   margin: 0 0 4px;
   color: #ff981f;

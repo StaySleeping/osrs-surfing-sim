@@ -218,6 +218,10 @@ export class ThreeRenderer implements IRenderer {
     this.orbitCamera?.snapNorth();
   }
 
+  setTrueTileVisible(visible: boolean): void {
+    this.overlays?.setTrueTileVisible(visible);
+  }
+
   showXpDrop(text: string, worldX: number, worldY: number): void {
     if (!this.xpContainer) {
       return;
