@@ -20,6 +20,9 @@ const COMBO_TIER_BAR_COLORS: Record<ComboTierName, string> = {
   Dragon: 'linear-gradient(180deg, #f0a050 0%, #8b2020 100%)',
 };
 
+/** OSRS hitpoints-bar green shown while no combo is active. */
+const COMBO_BAR_IDLE_COLOR = 'linear-gradient(180deg, #06c206 0%, #048004 100%)';
+
 type NavButtonId = 'toggle-full' | 'speed-down' | 'speed-up';
 
 interface NavButtonConfig {
@@ -29,20 +32,48 @@ interface NavButtonConfig {
   targetState: SpeedState | null;
 }
 
+interface StanceButtonConfig {
+  slot: TrickPrepareSlot;
+  icon: string;
+  features: string;
+  title: string;
+}
+
+const STANCE_BUTTONS: StanceButtonConfig[] = [
+  {
+    slot: 0,
+    icon: OSRS_ASSETS.surf.stanceGrind,
+    features: 'Rail · Coral',
+    title: 'Grind stance (1) — slide rails and brain coral',
+  },
+  {
+    slot: 1,
+    icon: OSRS_ASSETS.surf.stanceTuck,
+    features: 'Tunnel · Wall',
+    title: 'Tuck stance (2) — duck tunnels and wall rides',
+  },
+  {
+    slot: 2,
+    icon: OSRS_ASSETS.surf.stanceAir,
+    features: 'Jump',
+    title: 'Air stance (3) — launch off jumps',
+  },
+];
+
 export interface OsrsSailingPanelCallbacks {
   onSpeedState: (state: SpeedState) => void;
   onOpenShop: () => void;
   onPrepareTrick: (slot: TrickPrepareSlot) => void;
 }
 
-type PanelTab = 'movement' | 'rewards';
+type PanelTab = 'board' | 'stats' | 'rewards';
 
 function navButtonConfig(state: SpeedState, button: NavButtonId): NavButtonConfig {
   const a = OSRS_ASSETS;
   switch (button) {
     case 'toggle-full':
       return {
-        icon: state === 'riding' ? a.sailing.unsetSailsFast : a.sailing.setSails,
+        icon: state === 'riding' ? a.surf.boardPlanted : a.surf.ride,
         title: state === 'riding' ? 'Stop' : 'Full speed ahead',
         disabled: false,
         targetState: state === 'riding' ? 'seated' : 'riding',
@@ -66,14 +97,14 @@ function navButtonConfig(state: SpeedState, button: NavButtonId): NavButtonConfi
       }
       if (state === 'seated') {
         return {
-          icon: a.sailing.reverse,
+          icon: a.surf.reverse,
           title: 'Reverse',
           disabled: false,
           targetState: 'reversing',
         };
       }
       return {
-        icon: a.sailing.reverse,
+        icon: a.surf.reverse,
         title: 'Reverse',
         disabled: true,
         targetState: null,
@@ -81,7 +112,7 @@ function navButtonConfig(state: SpeedState, button: NavButtonId): NavButtonConfi
     case 'speed-up':
       if (state === 'reversing') {
         return {
-          icon: a.sailing.unsetSailsFast,
+          icon: a.surf.boardPlanted,
           title: 'Stop',
           disabled: false,
           targetState: 'seated',
@@ -115,7 +146,7 @@ function navButtonConfig(state: SpeedState, button: NavButtonId): NavButtonConfi
 export class OsrsSailingPanel {
   private root: HTMLElement;
   private callbacks: OsrsSailingPanelCallbacks;
-  private activeTab: PanelTab = 'movement';
+  private activeTab: PanelTab = 'board';
   private speedState: SpeedState = 'seated';
 
   constructor(root: HTMLElement, callbacks: OsrsSailingPanelCallbacks) {
@@ -130,11 +161,13 @@ export class OsrsSailingPanel {
     this.speedState = snapshot.surfboard.speedState;
 
     const steeringIcon = this.root.querySelector('#steering-icon') as HTMLImageElement;
+    const steeringLabel = this.root.querySelector('#steering-label');
+    const steering = snapshot.surfboard.speedState !== 'seated';
     if (steeringIcon) {
-      steeringIcon.src =
-        snapshot.surfboard.speedState === 'seated'
-          ? OSRS_ASSETS.sailing.notSteering
-          : OSRS_ASSETS.sailing.steering;
+      steeringIcon.src = steering ? OSRS_ASSETS.sailing.steering : OSRS_ASSETS.sailing.notSteering;
+    }
+    if (steeringLabel) {
+      steeringLabel.textContent = steering ? 'Steering' : 'Drifting';
     }
 
     this.updateNavButtons(snapshot.surfboard.speedState);
@@ -144,11 +177,20 @@ export class OsrsSailingPanel {
     if (comboFill && comboLabel) {
       const combo = snapshot.progression.session.combo;
       const progress = comboTierProgress(combo);
-      comboFill.style.width = combo > 0 ? `${(progress / 10) * 100}%` : '0%';
-      comboFill.style.background = COMBO_TIER_BAR_COLORS[comboTierName(combo)];
-      comboLabel.textContent = combo > 0 ? `${comboTierName(combo)} · ${combo}` : 'Combo';
+      comboFill.style.width = combo > 0 ? `${(progress / 10) * 100}%` : '100%';
+      comboFill.style.background =
+        combo > 0 ? COMBO_TIER_BAR_COLORS[comboTierName(combo)] : COMBO_BAR_IDLE_COLOR;
+      comboLabel.textContent = combo > 0 ? `${comboTierName(combo)} · ${combo}` : 'Ready';
     }
 
+    const session = snapshot.progression.session;
+    this.setText(
+      '#stats-combo',
+      session.combo > 0 ? `${session.combo} (${comboTierName(session.combo)})` : '0',
+    );
+    this.setText('#stats-max-combo', String(session.maxCombo));
+    this.setText('#stats-tricks', String(session.tricksLanded));
+    this.setText('#stats-tokens', String(snapshot.progression.coralTokens));
     this.syncTokenDisplay(snapshot.progression.coralTokens);
 
     this.root.querySelectorAll<HTMLButtonElement>('[data-prepare-slot]').forEach((btn) => {
@@ -158,12 +200,12 @@ export class OsrsSailingPanel {
         snapshot.trickPrepare.slot === slot &&
         snapshot.trickPrepare.ticksSincePrepare > 0;
       btn.classList.toggle('primed', primed);
-      const tickLabel = btn.querySelector('.prepare-ticks');
+      const tickLabel = btn.querySelector('.osrs-stance-ticks');
       if (tickLabel) {
         tickLabel.textContent =
           snapshot.trickPrepare?.slot === slot
             ? String(snapshot.trickPrepare.ticksSincePrepare)
-            : '·';
+            : '';
       }
     });
   }
@@ -177,55 +219,56 @@ export class OsrsSailingPanel {
     return `
       <div class="osrs-panel-chrome">
         <div class="osrs-panel-header">
-          <img src="${a.sailing.viewSailingOptions}" alt="" class="osrs-panel-icon" width="20" height="20" />
+          <img src="${a.surf.boardUpright}" alt="" class="osrs-panel-icon" width="18" height="18" />
           <span class="osrs-panel-title">Ura Ura Board</span>
-          <img src="${a.sailing.raft}" alt="" class="osrs-boat-thumb" width="32" height="32" />
         </div>
-        <div class="osrs-hp-bar">
-          <div class="osrs-hp-bar-fill" id="combo-bar-fill"></div>
-          <span class="osrs-hp-bar-label" id="combo-label">Combo</span>
+        <div class="osrs-status-bar">
+          <div class="osrs-status-bar-fill" id="combo-bar-fill" style="width: 100%; background: ${COMBO_BAR_IDLE_COLOR}"></div>
+          <span class="osrs-status-bar-label" id="combo-label">Ready</span>
         </div>
         <div class="osrs-tab-row">
-          <button type="button" class="osrs-tab active" data-tab="movement" title="Facilities">
-            <img src="${a.sailing.tabFacilities}" alt="Facilities" width="28" height="28" />
+          <button type="button" class="osrs-stone-tab active" data-tab="board" title="Surfboard">
+            <img src="${a.sailing.tabFacilities}" alt="Surfboard" width="20" height="20" />
           </button>
-          <button type="button" class="osrs-tab" data-tab="rewards" title="Crew">
-            <img src="${a.sailing.tabCrew}" alt="Crew" width="28" height="28" />
+          <button type="button" class="osrs-stone-tab" data-tab="stats" title="Session stats">
+            <img src="${a.sailing.tabStats}" alt="Session stats" width="20" height="20" />
+          </button>
+          <button type="button" class="osrs-stone-tab" data-tab="rewards" title="Coral rewards">
+            <img src="${a.sailing.tabCrew}" alt="Coral rewards" width="20" height="20" />
           </button>
         </div>
-        <div class="osrs-tab-body active" data-panel="movement">
-          <p class="osrs-section-label">Navigation</p>
+        <div class="osrs-tab-body active" data-panel="board">
+          <p class="osrs-panel-section-title">Surfboard</p>
           <div class="osrs-nav-row">
-            <button type="button" class="osrs-sprite-btn" data-nav-btn="toggle-full" title="Full speed ahead">
-              <img src="${a.sailing.setSails}" alt="" />
+            <button type="button" class="osrs-stone-sprite-btn" data-nav-btn="toggle-full" title="Full speed ahead">
+              <img src="${a.surf.ride}" alt="" width="26" height="26" />
             </button>
-            <button type="button" class="osrs-sprite-btn" data-nav-btn="speed-down" title="Slow down">
-              <img src="${a.chevron.down}" alt="" />
+            <button type="button" class="osrs-stone-sprite-btn" data-nav-btn="speed-down" title="Slow down">
+              <img src="${a.chevron.down}" alt="" width="20" height="20" />
             </button>
-            <button type="button" class="osrs-sprite-btn" data-nav-btn="speed-up" title="Increase speed">
-              <img src="${a.chevron.up}" alt="" />
-            </button>
-            <img src="${a.sailing.steering}" alt="" class="osrs-steering-badge" id="steering-icon" />
-          </div>
-          <p class="osrs-section-label">Stance</p>
-          <div class="osrs-trick-prepare-row">
-            <button type="button" class="osrs-trick-prepare-btn" data-prepare-slot="0" title="Low stance (1) — rail, brain coral">
-              <span class="prepare-label">${trickStanceName(0)}</span>
-              <span class="prepare-ticks">·</span>
-            </button>
-            <button type="button" class="osrs-trick-prepare-btn" data-prepare-slot="1" title="Medium stance (2) — tunnel, wall ride">
-              <span class="prepare-label">${trickStanceName(1)}</span>
-              <span class="prepare-ticks">·</span>
-            </button>
-            <button type="button" class="osrs-trick-prepare-btn" data-prepare-slot="2" title="High stance (3) — jump">
-              <span class="prepare-label">${trickStanceName(2)}</span>
-              <span class="prepare-ticks">·</span>
+            <button type="button" class="osrs-stone-sprite-btn" data-nav-btn="speed-up" title="Increase speed">
+              <img src="${a.chevron.up}" alt="" width="20" height="20" />
             </button>
           </div>
-          <p class="osrs-hint">Prime Low, Medium, or High 1–4 ticks before the matching feature. Too early or late = bail.</p>
+          <div class="osrs-steering-row">
+            <img src="${a.sailing.notSteering}" alt="" id="steering-icon" width="20" height="20" />
+            <span id="steering-label">Drifting</span>
+          </div>
+          <p class="osrs-panel-section-title">Stance</p>
+          <div class="osrs-stance-row">
+            ${STANCE_BUTTONS.map((stance) => this.renderStanceButton(stance)).join('')}
+          </div>
+          <p class="osrs-panel-footnote">Prime 1–4 ticks before the feature</p>
+        </div>
+        <div class="osrs-tab-body" data-panel="stats">
+          <p class="osrs-panel-section-title">Session</p>
+          <div class="osrs-stat-line">Combo: <span id="stats-combo">0</span></div>
+          <div class="osrs-stat-line">Best combo: <span id="stats-max-combo">0</span></div>
+          <div class="osrs-stat-line">Tricks landed: <span id="stats-tricks">0</span></div>
+          <div class="osrs-stat-line">Coral Tokens: <span id="stats-tokens">0</span></div>
         </div>
         <div class="osrs-tab-body" data-panel="rewards">
-          <p class="osrs-section-label">Coral Token Shop</p>
+          <p class="osrs-panel-section-title">Coral Token Shop</p>
           <div class="osrs-stat-line">Balance: <span id="coral-tokens-rewards">0</span></div>
           <button type="button" class="osrs-stone-btn" id="shop-btn">Open Reward Shop</button>
         </div>
@@ -233,12 +276,25 @@ export class OsrsSailingPanel {
     `;
   }
 
+  private renderStanceButton(stance: StanceButtonConfig): string {
+    return `
+      <button type="button" class="osrs-stone-sprite-btn osrs-stance-btn" data-prepare-slot="${stance.slot}" title="${stance.title}">
+        <span class="osrs-stance-ticks"></span>
+        <img src="${stance.icon}" alt="" width="24" height="24" />
+        <span class="osrs-stance-name">${trickStanceName(stance.slot)}</span>
+        <span class="osrs-stance-features">${stance.features}</span>
+      </button>
+    `;
+  }
+
   private bindEvents(): void {
-    for (const tab of this.root.querySelectorAll<HTMLButtonElement>('.osrs-tab')) {
+    for (const tab of this.root.querySelectorAll<HTMLButtonElement>('.osrs-stone-tab')) {
       tab.addEventListener('click', () => {
         const id = tab.dataset.tab as PanelTab;
         this.activeTab = id;
-        this.root.querySelectorAll('.osrs-tab').forEach((el) => el.classList.remove('active'));
+        this.root
+          .querySelectorAll('.osrs-stone-tab')
+          .forEach((el) => el.classList.remove('active'));
         tab.classList.add('active');
         this.root.querySelectorAll('.osrs-tab-body').forEach((el) => {
           el.classList.toggle('active', (el as HTMLElement).dataset.panel === id);
@@ -283,6 +339,13 @@ export class OsrsSailingPanel {
       }
       btn.classList.toggle('active', id === 'toggle-full' && state === 'riding');
     });
+  }
+
+  private setText(selector: string, value: string): void {
+    const el = this.root.querySelector(selector);
+    if (el) {
+      el.textContent = value;
+    }
   }
 
   syncTokenDisplay(tokens: number): void {
