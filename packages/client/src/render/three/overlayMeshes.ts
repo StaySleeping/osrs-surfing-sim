@@ -1,26 +1,74 @@
 import {
+  coralParkLandSurfaceY,
   getTile,
   headingToDegrees,
   normalizeAngle,
+  tideRideSurfaceY,
   type SimulationSnapshot,
   type WorldMap,
 } from '@osrs-surfing/engine';
 import {
   BufferGeometry,
+  DoubleSide,
   Float32BufferAttribute,
   Group,
   Line,
   LineBasicMaterial,
+  LineLoop,
   Mesh,
   MeshBasicMaterial,
+  PlaneGeometry,
   TorusGeometry,
 } from 'three';
+
+import type { DisplaySimulationSnapshot } from '../visualSnapshot.js';
 
 import { tileToWorld3 } from './worldCoords.js';
 
 const OVERLAY_Y = 0.2;
 const CLICK_ARROW_RADIUS_TILES = 1.4;
 const ARROW_ORBIT_RADIUS_TILES = 0.9;
+
+const TRUE_TILE_COLOR = 0x00c8b4;
+const TRUE_TILE_FILL_OPACITY = 0.3;
+const TRUE_TILE_BORDER_OPACITY = 0.9;
+/** Lift above the surface to avoid z-fighting with water and sand. */
+const TRUE_TILE_LIFT_Y = 0.07;
+
+function buildTrueTileMarker(): Group {
+  const group = new Group();
+
+  const fill = new Mesh(
+    new PlaneGeometry(1, 1),
+    new MeshBasicMaterial({
+      color: TRUE_TILE_COLOR,
+      transparent: true,
+      opacity: TRUE_TILE_FILL_OPACITY,
+      side: DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  fill.rotation.x = -Math.PI / 2;
+
+  const half = 0.5;
+  const borderGeometry = new BufferGeometry();
+  borderGeometry.setAttribute(
+    'position',
+    new Float32BufferAttribute([-half, 0, -half, half, 0, -half, half, 0, half, -half, 0, half], 3),
+  );
+  const border = new LineLoop(
+    borderGeometry,
+    new LineBasicMaterial({
+      color: TRUE_TILE_COLOR,
+      transparent: true,
+      opacity: TRUE_TILE_BORDER_OPACITY,
+    }),
+  );
+
+  group.add(fill, border);
+  group.visible = false;
+  return group;
+}
 
 function makeLine(points: number[], color: number, opacity = 1): Line {
   const geometry = new BufferGeometry();
@@ -35,13 +83,22 @@ export class OverlayLayer {
   private readonly facing = new Group();
   private readonly headingArrow = new Group();
   private readonly intendedGhost = new Group();
+  private readonly trueTile = buildTrueTileMarker();
+  private trueTileEnabled = false;
   private lines: Line[] = [];
 
   constructor() {
-    this.root.add(this.walkClick, this.tide, this.facing, this.headingArrow, this.intendedGhost);
+    this.root.add(
+      this.walkClick,
+      this.tide,
+      this.facing,
+      this.headingArrow,
+      this.intendedGhost,
+      this.trueTile,
+    );
   }
 
-  sync(snapshot: SimulationSnapshot, map: WorldMap): void {
+  sync(snapshot: DisplaySimulationSnapshot, map: WorldMap): void {
     this.clearDynamic();
 
     this.drawWalkClick(snapshot);
@@ -49,6 +106,26 @@ export class OverlayLayer {
     this.drawFacing(snapshot, map);
     this.drawHeadingArrow(snapshot);
     this.drawIntendedGhost(snapshot);
+    this.updateTrueTile(snapshot, map);
+  }
+
+  setTrueTileVisible(visible: boolean): void {
+    this.trueTileEnabled = visible;
+    this.trueTile.visible = visible;
+  }
+
+  private updateTrueTile(snapshot: DisplaySimulationSnapshot, map: WorldMap): void {
+    if (!this.trueTileEnabled) {
+      return;
+    }
+    const tx = Math.floor(snapshot.simulationPosition.x);
+    const ty = Math.floor(snapshot.simulationPosition.y);
+    const tile = getTile(map, tx, ty);
+    const surfaceY =
+      tile === 'grass' || tile === 'sand'
+        ? coralParkLandSurfaceY(tx + 0.5, ty + 0.5, tile)
+        : tideRideSurfaceY(tx + 0.5, ty + 0.5, snapshot.tide);
+    this.trueTile.position.set(tx + 0.5, surfaceY + TRUE_TILE_LIFT_Y, ty + 0.5);
   }
 
   private clearDynamic(): void {
@@ -223,5 +300,12 @@ export class OverlayLayer {
 
   dispose(): void {
     this.clearDynamic();
+    for (const child of this.trueTile.children) {
+      if (child instanceof Mesh || child instanceof Line) {
+        child.geometry.dispose();
+        (child.material as MeshBasicMaterial | LineBasicMaterial).dispose();
+      }
+    }
+    this.trueTile.clear();
   }
 }

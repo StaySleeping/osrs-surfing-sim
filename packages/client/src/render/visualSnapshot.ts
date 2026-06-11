@@ -23,6 +23,8 @@ export type DisplaySimulationSnapshot = Omit<
 > & {
   trickAnimation: DisplayTrickAnimation | null;
   demoSurfers: DisplayDemoSurferSnapshot[];
+  /** Raw player position from the latest simulation tick (no interpolation). */
+  simulationPosition: WorldPos;
 };
 
 interface EntityMotionSegment {
@@ -282,6 +284,7 @@ export class SurfboardMotionInterpolator {
       trickAnimation: player.trickAnimation,
       tide: displayTide,
       demoSurfers,
+      simulationPosition: { ...snapshot.surfboard.position },
     };
   }
 }
