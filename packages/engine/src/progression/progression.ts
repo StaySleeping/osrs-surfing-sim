@@ -1,4 +1,4 @@
-import { comboXpMultiplier } from './combo.js';
+import { comboAfterBail, comboXpMultiplier } from './combo.js';
 import type { ProgressionState, UnlockDefinition, UnlockId } from './types.js';
 import { UNLOCK_REGISTRY } from './types.js';
 
@@ -193,11 +193,12 @@ export function awardTrick(
 }
 
 export function decayCombo(state: ProgressionState): ProgressionState {
-  if (state.session.combo === 0) {
+  const combo = comboAfterBail(state.session.combo);
+  if (combo === state.session.combo) {
     return state;
   }
   return {
     ...state,
-    session: { ...state.session, combo: 0 },
+    session: { ...state.session, combo },
   };
 }

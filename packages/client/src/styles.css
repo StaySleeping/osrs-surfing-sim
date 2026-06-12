@@ -414,6 +414,14 @@ body,
   text-shadow: 1px 1px 0 #000;
 }
 
+.osrs-surf-boost-bar {
+  margin-top: 2px;
+}
+
+.osrs-surf-boost-bar.hidden {
+  display: none;
+}
+
 .osrs-tab-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

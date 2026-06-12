@@ -15,6 +15,12 @@ import {
 import { DEFAULT_SURFBOARD_STATS } from '../constants/movement.js';
 import type { HeadingIndex } from '../movement/heading.js';
 import {
+  advanceTrickSpeedBoost,
+  applyTrickSpeedBoost,
+  refreshTrickSpeedBoost,
+  type TrickSpeedBoostState,
+} from '../movement/trickSpeedBoost.js';
+import {
   createSurfboard,
   tickSurfboard,
   type SurfboardState,
@@ -53,6 +59,7 @@ export interface DemoSurferSnapshot {
   surfboard: SurfboardState;
   trickPrepare: TrickPrepareState | null;
   trickAnimation: TrickAnimationSnapshot | null;
+  trickSpeedBoostTicksRemaining: number;
   /** 0–1 progress through an active tide spin, or null when not spinning. */
   tideSpinProgress: number | null;
 }
@@ -66,6 +73,7 @@ interface DemoSurferRuntime {
   trickAnimation: TrickAnimationState | null;
   activeTrickZoneId: string | null;
   tideSpinTicksRemaining: number;
+  trickSpeedBoost: TrickSpeedBoostState | null;
   stats: SurfboardStats;
 }
 
@@ -105,6 +113,7 @@ export function createDemoSurfer(
     trickAnimation: null,
     activeTrickZoneId: null,
     tideSpinTicksRemaining: 0,
+    trickSpeedBoost: null,
     stats: surferStats,
   };
 }
@@ -123,6 +132,7 @@ export function toDemoSurferSnapshot(runtime: DemoSurferRuntime): DemoSurferSnap
     surfboard: { ...runtime.surfboard, position: { ...runtime.surfboard.position } },
     trickPrepare: runtime.trickPrepare ? { ...runtime.trickPrepare } : null,
     trickAnimation: toTrickAnimationSnapshot(runtime.trickAnimation),
+    trickSpeedBoostTicksRemaining: runtime.trickSpeedBoost?.ticksRemaining ?? 0,
     tideSpinProgress: tideSpinProgress(runtime),
   };
 }
@@ -143,6 +153,7 @@ function resolveDemoTrickEntry(
     ...runtime,
     trickPrepare: null,
     trickAnimation,
+    trickSpeedBoost: refreshTrickSpeedBoost(),
     activeTrickZoneId: null,
     tideSpinTicksRemaining: 0,
     surfboard: {
@@ -248,12 +259,27 @@ export function tickDemoSurfer(
     };
   }
 
-  const moveResult = tickSurfboard(next.surfboard, map, surfInput, next.stats);
+  const boostActive =
+    next.trickSpeedBoost !== null && next.surfboard.speedState === 'riding' && !next.trickAnimation;
+  const effectiveStats = applyTrickSpeedBoost(
+    next.stats,
+    boostActive ? next.trickSpeedBoost : null,
+  );
+  const moveResult = tickSurfboard(next.surfboard, map, surfInput, effectiveStats);
   next = {
     ...next,
     surfboard: moveResult.state,
     trickPrepare: advanceTrickPrepare(next.trickPrepare),
   };
+
+  if (next.surfboard.speedState !== 'riding') {
+    next = { ...next, trickSpeedBoost: null };
+  } else if (boostActive && next.trickSpeedBoost) {
+    next = {
+      ...next,
+      trickSpeedBoost: advanceTrickSpeedBoost(next.trickSpeedBoost, true),
+    };
+  }
 
   if (next.surfboard.speedState !== 'seated') {
     const zone = findTrickZoneAt(trickZones, next.surfboard.position, tide);

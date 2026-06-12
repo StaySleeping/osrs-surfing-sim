@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { comboTierName, comboTierProgress, comboXpMultiplier } from './combo.js';
+import {
+  COMBO_TIERS,
+  COMBO_TIER_SIZE,
+  comboAfterBail,
+  comboTierName,
+  comboTierProgress,
+  comboXpMultiplier,
+} from './combo.js';
 import {
   awardTrick,
   canPurchaseUnlock,
   createProgressionState,
+  decayCombo,
   deserializeProgressionState,
   purchaseUnlock,
   rollCoralTokenDrop,
@@ -63,6 +71,57 @@ describe('progression', () => {
     expect(comboTierProgress(10)).toBe(10);
     expect(comboTierProgress(23)).toBe(3);
     expect(comboTierName(23)).toBe('Steel');
+  });
+
+  it('drops combo to the previous tier start on bail through dragon', () => {
+    expect(comboAfterBail(0)).toBe(0);
+
+    for (let combo = 1; combo <= COMBO_TIER_SIZE - 1; combo += 1) {
+      expect(comboAfterBail(combo)).toBe(0);
+    }
+
+    for (let tierIndex = 1; tierIndex < COMBO_TIERS.length; tierIndex += 1) {
+      const tierStart = tierIndex * COMBO_TIER_SIZE;
+      const previousTierStart = (tierIndex - 1) * COMBO_TIER_SIZE;
+      const tierEnd = tierStart + COMBO_TIER_SIZE - 1;
+      const midCombo = tierStart + 5;
+
+      expect(comboTierName(midCombo)).toBe(COMBO_TIERS[tierIndex]);
+      expect(comboAfterBail(tierStart)).toBe(previousTierStart);
+      expect(comboAfterBail(midCombo)).toBe(previousTierStart);
+      expect(comboAfterBail(tierEnd)).toBe(previousTierStart);
+    }
+
+    const dragonCap = COMBO_TIERS.length * COMBO_TIER_SIZE;
+    const runeTierStart = (COMBO_TIERS.length - 2) * COMBO_TIER_SIZE;
+    expect(comboTierName(dragonCap)).toBe('Dragon');
+    expect(comboAfterBail(dragonCap)).toBe(runeTierStart);
+
+    for (const combo of [71, 75, 80, 85, 99, 120]) {
+      expect(comboTierName(combo)).toBe('Dragon');
+      expect(comboAfterBail(combo)).toBe(runeTierStart);
+    }
+  });
+
+  it('decayCombo preserves tricks landed and max combo', () => {
+    const state = {
+      ...createProgressionState(),
+      session: { tricksLanded: 25, combo: 25, maxCombo: 30 },
+    };
+    const decayed = decayCombo(state);
+    expect(decayed.session.combo).toBe(10);
+    expect(decayed.session.tricksLanded).toBe(25);
+    expect(decayed.session.maxCombo).toBe(30);
+  });
+
+  it('decayCombo from post-cap dragon combo drops to rune tier', () => {
+    const state = {
+      ...createProgressionState(),
+      session: { tricksLanded: 85, combo: 85, maxCombo: 85 },
+    };
+    const decayed = decayCombo(state);
+    expect(decayed.session.combo).toBe(50);
+    expect(decayed.session.maxCombo).toBe(85);
   });
 
   it('purchases unlock when requirements met', () => {

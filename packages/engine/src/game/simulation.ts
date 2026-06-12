@@ -18,6 +18,12 @@ import {
   type SurfboardState,
   type SurfboardStats,
 } from '../movement/surfboard.js';
+import {
+  advanceTrickSpeedBoost,
+  applyTrickSpeedBoost,
+  refreshTrickSpeedBoost,
+  type TrickSpeedBoostState,
+} from '../movement/trickSpeedBoost.js';
 import { isWorldPointNavigable, isWorldPointSailingTarget } from '../world/collision.js';
 import {
   findNpcAt,
@@ -91,6 +97,7 @@ export interface SimulationSnapshot {
   onFootMoving: boolean;
   trickPrepare: TrickPrepareState | null;
   trickAnimation: TrickAnimationSnapshot | null;
+  trickSpeedBoostTicksRemaining: number;
   demoSurfers: DemoSurferSnapshot[];
 }
 
@@ -129,6 +136,7 @@ export class GameSimulation {
   private trickPrepare: TrickPrepareState | null = null;
   private activeTrickZoneId: string | null = null;
   private trickAnimation: TrickAnimationState | null = null;
+  private trickSpeedBoost: TrickSpeedBoostState | null = null;
   private tideFrozen = false;
   private cameraFacingRadians: number | null = null;
   private movementFrozen = false;
@@ -182,6 +190,7 @@ export class GameSimulation {
       onFootMoving: this.walk !== null,
       trickPrepare: this.trickPrepare ? { ...this.trickPrepare } : null,
       trickAnimation: toTrickAnimationSnapshot(this.trickAnimation),
+      trickSpeedBoostTicksRemaining: this.trickSpeedBoost?.ticksRemaining ?? 0,
       demoSurfers: this.demoSurfers.map((surfer) => toDemoSurferSnapshot(surfer)),
     };
   }
@@ -452,6 +461,7 @@ export class GameSimulation {
     const result = awardTrick(this.progression);
     this.progression = result.state;
     this.trickZones = markZoneTricked(this.trickZones, zone.id);
+    this.trickSpeedBoost = refreshTrickSpeedBoost();
     this.trickAnimation = createTrickAnimationState(
       this.arena.map,
       zone,
@@ -476,6 +486,7 @@ export class GameSimulation {
   private bailTrick(zone: TrickZone, reason?: string): void {
     this.trickPrepare = null;
     this.trickAnimation = null;
+    this.trickSpeedBoost = null;
     this.progression = decayCombo(this.progression);
     this.activeTrickZoneId = null;
     this.surfboard = {
@@ -563,10 +574,28 @@ export class GameSimulation {
       if (this.trickAnimation) {
         this.tickTrickAnimationMovement();
       } else {
-        const result = tickSurfboard(this.surfboard, this.arena.map, this.pendingInput, this.stats);
+        const boostActive =
+          this.trickSpeedBoost !== null &&
+          this.surfboard.speedState === 'riding' &&
+          !this.trickAnimation;
+        const effectiveStats = applyTrickSpeedBoost(
+          this.stats,
+          boostActive ? this.trickSpeedBoost : null,
+        );
+        const result = tickSurfboard(
+          this.surfboard,
+          this.arena.map,
+          this.pendingInput,
+          effectiveStats,
+        );
         this.surfboard = result.state;
-        if (this.surfboard.speedState !== 'riding' && this.trickPrepare) {
-          this.clearTrickPrepare();
+        if (this.surfboard.speedState !== 'riding') {
+          this.trickSpeedBoost = null;
+          if (this.trickPrepare) {
+            this.clearTrickPrepare();
+          }
+        } else if (boostActive && this.trickSpeedBoost) {
+          this.trickSpeedBoost = advanceTrickSpeedBoost(this.trickSpeedBoost, true);
         }
       }
     } else if (this.walk) {
