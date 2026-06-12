@@ -4,6 +4,7 @@ export * from './movement/heading.js';
 export * from './movement/onFoot.js';
 export * from './movement/pathfinder.js';
 export * from './movement/surfboard.js';
+export * from './movement/trickSpeedBoost.js';
 export * from './world/coords.js';
 export * from './world/collision.js';
 export * from './world/features.js';

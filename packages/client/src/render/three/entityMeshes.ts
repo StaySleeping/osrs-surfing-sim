@@ -30,6 +30,12 @@ const NPC_SHIRT = 0xa8442c;
 const NPC_HAIR = 0x5c3a1e;
 const WAKE_PINK = 0xf4a7b9;
 const WAKE_WHITE = 0xffffff;
+const WAKE_BOOST_SCALE = 1.2;
+const WAKE_BOOST_OPACITY_FACTOR = 1.25;
+const PLAYER_WAKE_OUTER_OPACITY = 0.4;
+const PLAYER_WAKE_INNER_OPACITY = 0.35;
+const DEMO_SURFER_WAKE_OUTER_OPACITY = 0.32;
+const DEMO_SURFER_WAKE_INNER_OPACITY = 0.28;
 
 interface DemoSurferStyle {
   shirt: number;
@@ -223,13 +229,40 @@ function makeWakeMesh(outerOpacity: number, innerOpacity: number): Group {
   return wake;
 }
 
+function applyWakeBoost(
+  wake: Group,
+  boosted: boolean,
+  baseOuterOpacity: number,
+  baseInnerOpacity: number,
+): void {
+  const scale = boosted ? WAKE_BOOST_SCALE : 1;
+  wake.scale.set(scale, 1, scale);
+  const outer = wake.children[0];
+  const inner = wake.children[1];
+  if (!(outer instanceof Mesh) || !(inner instanceof Mesh)) {
+    return;
+  }
+  const outerMat = outer.material;
+  const innerMat = inner.material;
+  if (!(outerMat instanceof MeshStandardMaterial) || !(innerMat instanceof MeshStandardMaterial)) {
+    return;
+  }
+  const opacityFactor = boosted ? WAKE_BOOST_OPACITY_FACTOR : 1;
+  outerMat.opacity = baseOuterOpacity * opacityFactor;
+  innerMat.opacity = baseInnerOpacity * opacityFactor;
+}
+
 interface DemoSurferVisual {
   parts: SurferRig;
   rider: Group;
 }
 
 function makeDemoSurferVisual(style: DemoSurferStyle): DemoSurferVisual {
-  const parts = makeSurferRig(style.boardWood, style.boardStripe, makeWakeMesh(0.32, 0.28));
+  const parts = makeSurferRig(
+    style.boardWood,
+    style.boardStripe,
+    makeWakeMesh(DEMO_SURFER_WAKE_OUTER_OPACITY, DEMO_SURFER_WAKE_INNER_OPACITY),
+  );
   const rider = makeHumanoidMesh({ shirt: style.shirt, pants: PLAYER_PANTS, hair: style.hair });
   parts.riderAnchor.add(rider);
   parts.rig.visible = false;
@@ -242,7 +275,11 @@ function makeNpcMesh(): Group {
 
 export class EntityLayer {
   readonly root = new Group();
-  private readonly playerParts = makeSurferRig(BOARD_WOOD, BOARD_STRIPE, makeWakeMesh(0.4, 0.35));
+  private readonly playerParts = makeSurferRig(
+    BOARD_WOOD,
+    BOARD_STRIPE,
+    makeWakeMesh(PLAYER_WAKE_OUTER_OPACITY, PLAYER_WAKE_INNER_OPACITY),
+  );
   private readonly dockBoard = makeSurfboardMesh();
   private readonly player = makePlayerMesh();
   private readonly demoSurferPool: DemoSurferVisual[] = [];
@@ -315,6 +352,7 @@ export class EntityLayer {
     applySurferPose(this.playerParts, this.player, riderPose);
 
     const showWake = snapshot.surfboard.speedState === 'riding' && snapshot.trickAnimation === null;
+    const boosted = snapshot.trickSpeedBoostTicksRemaining > 0;
     this.playerParts.wake.visible = showWake;
     if (showWake) {
       const behind = headingRad + Math.PI;
@@ -324,6 +362,12 @@ export class EntityLayer {
         riderPose.worldZ + Math.sin(behind) * 0.85,
       );
       this.playerParts.wake.rotation.set(0, rotationY, 0);
+      applyWakeBoost(
+        this.playerParts.wake,
+        boosted,
+        PLAYER_WAKE_OUTER_OPACITY,
+        PLAYER_WAKE_INNER_OPACITY,
+      );
     }
   }
 
@@ -360,6 +404,7 @@ export class EntityLayer {
       const showWake =
         demo.trickAnimation === null &&
         (demo.surfboard.speedState === 'riding' || demo.tideSpinProgress !== null);
+      const boosted = demo.trickSpeedBoostTicksRemaining > 0;
       visual.parts.wake.visible = showWake;
       if (showWake) {
         const behind = headingRad + Math.PI;
@@ -369,6 +414,12 @@ export class EntityLayer {
           riderPose.worldZ + Math.sin(behind) * 0.85,
         );
         visual.parts.wake.rotation.set(0, riderPose.rotationY, 0);
+        applyWakeBoost(
+          visual.parts.wake,
+          boosted,
+          DEMO_SURFER_WAKE_OUTER_OPACITY,
+          DEMO_SURFER_WAKE_INNER_OPACITY,
+        );
       }
     }
   }

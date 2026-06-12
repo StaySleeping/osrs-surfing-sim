@@ -3,6 +3,7 @@ import {
   comboTierProgress,
   TRICK_PREPARE_MAX_TICKS,
   TRICK_PREPARE_MIN_TICKS,
+  TRICK_SPEED_BOOST_DURATION_TICKS,
   trickStanceName,
   type SimulationSnapshot,
   type SpeedState,
@@ -24,6 +25,8 @@ const COMBO_TIER_BAR_COLORS: Record<ComboTierName, string> = {
 
 /** OSRS hitpoints-bar green shown while no combo is active. */
 const COMBO_BAR_IDLE_COLOR = 'linear-gradient(180deg, #06c206 0%, #048004 100%)';
+
+const SURF_BOOST_BAR_COLOR = 'linear-gradient(180deg, #7ee8f0 0%, #1a7a8a 100%)';
 
 type NavButtonId = 'toggle-full' | 'speed-down' | 'speed-up';
 
@@ -188,6 +191,20 @@ export class OsrsSailingPanel {
       comboLabel.textContent = combo > 0 ? `${comboTierName(combo)} · ${combo}` : 'Ready';
     }
 
+    const boostBar = this.root.querySelector('#surf-boost-bar') as HTMLElement;
+    const boostFill = this.root.querySelector('#surf-boost-bar-fill') as HTMLElement;
+    const boostLabel = this.root.querySelector('#surf-boost-label');
+    const boostTicks = snapshot.trickSpeedBoostTicksRemaining;
+    if (boostBar && boostFill && boostLabel) {
+      const active = boostTicks > 0;
+      boostBar.classList.toggle('hidden', !active);
+      if (active) {
+        boostFill.style.width = `${(boostTicks / TRICK_SPEED_BOOST_DURATION_TICKS) * 100}%`;
+        boostFill.style.background = SURF_BOOST_BAR_COLOR;
+        boostLabel.textContent = `Surf boost · ${boostTicks}`;
+      }
+    }
+
     const session = snapshot.progression.session;
     this.setText(
       '#stats-combo',
@@ -243,6 +260,10 @@ export class OsrsSailingPanel {
         <div class="osrs-status-bar">
           <div class="osrs-status-bar-fill" id="combo-bar-fill" style="width: 100%; background: ${COMBO_BAR_IDLE_COLOR}"></div>
           <span class="osrs-status-bar-label" id="combo-label">Ready</span>
+        </div>
+        <div class="osrs-status-bar osrs-surf-boost-bar hidden" id="surf-boost-bar">
+          <div class="osrs-status-bar-fill osrs-surf-boost-bar-fill" id="surf-boost-bar-fill" style="width: 100%; background: ${SURF_BOOST_BAR_COLOR}"></div>
+          <span class="osrs-status-bar-label" id="surf-boost-label">Surf boost</span>
         </div>
         <div class="osrs-tab-row">
           <button type="button" class="osrs-stone-tab active" data-tab="board" title="Surfboard">
