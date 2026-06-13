@@ -5,7 +5,7 @@ import {
 } from '../constants/tricks.js';
 import { headingToDegrees, type HeadingIndex } from '../movement/heading.js';
 import type { WorldPos } from './coords.js';
-import { isPointInTrickZoneHitbox } from './trickHitbox.js';
+import { isPointInTrickZoneHitbox, segmentIntersectsTrickZoneHitbox } from './trickHitbox.js';
 
 /** Max angle between rider heading and feature approach direction. */
 export const TRICK_APPROACH_TOLERANCE_DEG = 70;
@@ -342,6 +342,7 @@ export function findTrickZoneAt(
   zones: TrickZone[],
   pos: WorldPos,
   tide: TideState | null,
+  prevPos?: WorldPos,
 ): TrickZone | null {
   let best: TrickZone | null = null;
   let bestDist = Infinity;
@@ -356,7 +357,11 @@ export function findTrickZoneAt(
     const dx = pos.x - zone.center.x;
     const dy = pos.y - zone.center.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (isPointInTrickZoneHitbox(zone, pos) && dist < bestDist) {
+    const inHitbox =
+      prevPos !== undefined
+        ? segmentIntersectsTrickZoneHitbox(zone, prevPos, pos)
+        : isPointInTrickZoneHitbox(zone, pos);
+    if (inHitbox && dist < bestDist) {
       best = zone;
       bestDist = dist;
     }

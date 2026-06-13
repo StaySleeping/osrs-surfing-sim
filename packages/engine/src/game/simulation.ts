@@ -26,6 +26,7 @@ import {
   type TrickSpeedBoostState,
 } from '../movement/trickSpeedBoost.js';
 import { getTile, isWorldPointNavigable, isWorldPointSailingTarget } from '../world/collision.js';
+import type { WorldPos } from '../world/coords.js';
 import {
   findNpcAt,
   findNpcNear,
@@ -603,7 +604,7 @@ export class GameSimulation {
     );
   }
 
-  private checkTrickZoneResolution(): void {
+  private checkTrickZoneResolution(prevPosition: WorldPos): void {
     if (this.trickAnimation) {
       return;
     }
@@ -612,7 +613,7 @@ export class GameSimulation {
       return;
     }
 
-    const zone = findTrickZoneAt(this.trickZones, this.surfboard.position, this.tide);
+    const zone = findTrickZoneAt(this.trickZones, this.surfboard.position, this.tide, prevPosition);
     if (!zone) {
       this.activeTrickZoneId = null;
       return;
@@ -674,6 +675,7 @@ export class GameSimulation {
   }
 
   tick(): void {
+    const rideStartPosition = { ...this.surfboard.position };
     if (this.boardMounted && !this.movementFrozen) {
       if (this.trickAnimation) {
         this.tickTrickAnimationMovement();
@@ -722,7 +724,7 @@ export class GameSimulation {
     }
     this.pendingInput = {};
     this.trickPrepare = advanceTrickPrepare(this.trickPrepare);
-    this.checkTrickZoneResolution();
+    this.checkTrickZoneResolution(rideStartPosition);
 
     if (this.tide && !this.tideFrozen) {
       this.tide = tickTide(this.tide);

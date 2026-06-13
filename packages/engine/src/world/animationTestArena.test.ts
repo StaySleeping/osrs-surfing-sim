@@ -165,4 +165,17 @@ describe('animation test arena', () => {
     rideEastboundTrick(sim, counterRail!, slice.map.widthTiles);
     expectEastboundExit(sim, counterRail!);
   });
+
+  it('lands wall ride from eastbound and lateral crossings with tuck primed', () => {
+    const slice = createAnimationTestSlice();
+    const wall = slice.trickZones.find((zone) => zone.id === 'anim-wall_ride');
+    expect(wall).toBeDefined();
+
+    const sim = new GameSimulation({ arena: slice });
+    mountAndRide(sim, slice.boardDockX, slice.boardDockY);
+    stageWestOfZone(sim, wall!);
+    alignToRow(sim, wall!.center.y);
+    rideEastboundTrick(sim, wall!, slice.map.widthTiles);
+    expectEastboundExit(sim, wall!);
+  });
 });

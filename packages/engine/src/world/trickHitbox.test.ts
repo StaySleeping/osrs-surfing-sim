@@ -1,14 +1,28 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TrickZone } from './features.js';
+import { findTrickZoneAt } from './features.js';
 import {
   isPointInTrickZoneHitbox,
+  segmentIntersectsTrickZoneHitbox,
   TRICK_HITBOX_HALF_ALONG_RIDE,
   TRICK_HITBOX_HALF_LATERAL,
   trickZoneHitboxExtents,
   tunnelTrickHitboxFactors,
   WALL_RIDE_HITBOX_PAD_TILES,
 } from './trickHitbox.js';
+
+function wallRideZone(rotationRadians = 0, center = { x: 0, y: 0 }): TrickZone {
+  return {
+    id: 'wall',
+    type: 'wall_ride',
+    prepareSlot: 1,
+    center,
+    radius: 4,
+    rotationRadians,
+    tricked: false,
+  };
+}
 
 function railZone(rotationRadians = 0): TrickZone {
   return {
@@ -60,15 +74,7 @@ describe('trickZoneHitbox', () => {
   });
 
   it('pads wall ride hitboxes for glancing slide-up approaches', () => {
-    const zone: TrickZone = {
-      id: 'wall',
-      type: 'wall_ride',
-      prepareSlot: 1,
-      center: { x: 0, y: 0 },
-      radius: 4,
-      rotationRadians: 0,
-      tricked: false,
-    };
+    const zone = wallRideZone();
     const { halfAlongRide, halfLateral } = trickZoneHitboxExtents('wall_ride', zone.radius);
     const baseHalfAlong = zone.radius * TRICK_HITBOX_HALF_ALONG_RIDE.wall_ride;
     const baseHalfLateral = zone.radius * TRICK_HITBOX_HALF_LATERAL.wall_ride;
@@ -79,6 +85,35 @@ describe('trickZoneHitbox', () => {
     expect(isPointInTrickZoneHitbox(zone, { x: baseHalfAlong + 0.6, y: 0 })).toBe(false);
     expect(isPointInTrickZoneHitbox(zone, { x: 0, y: baseHalfLateral + 0.4 })).toBe(true);
     expect(isPointInTrickZoneHitbox(zone, { x: 0, y: baseHalfLateral + 0.6 })).toBe(false);
+  });
+
+  it('detects wall ride crossings when both movement endpoints are outside', () => {
+    const zone = wallRideZone();
+    const { halfLateral } = trickZoneHitboxExtents('wall_ride', zone.radius);
+    const from = { x: 0, y: -(halfLateral + 1.5) };
+    const to = { x: 0, y: halfLateral + 1.5 };
+
+    expect(isPointInTrickZoneHitbox(zone, from)).toBe(false);
+    expect(isPointInTrickZoneHitbox(zone, to)).toBe(false);
+    expect(segmentIntersectsTrickZoneHitbox(zone, from, to)).toBe(true);
+    expect(findTrickZoneAt([zone], to, null, from)).toBe(zone);
+  });
+
+  it('detects rotated wall ride crossings from lateral and diagonal approaches', () => {
+    const zone = wallRideZone(Math.PI / 2);
+    const { halfAlongRide, halfLateral } = trickZoneHitboxExtents('wall_ride', zone.radius);
+
+    const lateralFrom = { x: halfLateral + 1.5, y: 0 };
+    const lateralTo = { x: -(halfLateral + 1.5), y: 0 };
+    expect(segmentIntersectsTrickZoneHitbox(zone, lateralFrom, lateralTo)).toBe(true);
+
+    const diagonalFrom = { x: -2.5, y: -2.5 };
+    const diagonalTo = { x: 2.5, y: 2.5 };
+    expect(segmentIntersectsTrickZoneHitbox(zone, diagonalFrom, diagonalTo)).toBe(true);
+
+    const alongFrom = { x: 0, y: -(halfAlongRide + 1) };
+    const alongTo = { x: 0, y: halfAlongRide + 1 };
+    expect(segmentIntersectsTrickZoneHitbox(zone, alongFrom, alongTo)).toBe(true);
   });
 
   it('wraps the scaled tunnel half-torus in ride-oriented space', () => {
