@@ -145,3 +145,75 @@ export function isPointInTrickZoneHitbox(zone: TrickZone, pos: WorldPos): boolea
   const local = trickZoneLocalOffset(zone, pos);
   return Math.abs(local.alongRide) <= halfAlongRide && Math.abs(local.lateral) <= halfLateral;
 }
+
+function segmentIntersectsLocalAabb(
+  from: { alongRide: number; lateral: number },
+  to: { alongRide: number; lateral: number },
+  halfAlongRide: number,
+  halfLateral: number,
+): boolean {
+  const dx = to.alongRide - from.alongRide;
+  const dy = to.lateral - from.lateral;
+  let t0 = 0;
+  let t1 = 1;
+
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) {
+      return q >= 0;
+    }
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) {
+        return false;
+      }
+      if (r > t0) {
+        t0 = r;
+      }
+    } else {
+      if (r < t0) {
+        return false;
+      }
+      if (r < t1) {
+        t1 = r;
+      }
+    }
+    return true;
+  };
+
+  if (!clip(-dx, from.alongRide + halfAlongRide)) {
+    return false;
+  }
+  if (!clip(dx, halfAlongRide - from.alongRide)) {
+    return false;
+  }
+  if (!clip(-dy, from.lateral + halfLateral)) {
+    return false;
+  }
+  if (!clip(dy, halfLateral - from.lateral)) {
+    return false;
+  }
+
+  return t0 <= t1;
+}
+
+/** True when a movement segment crosses the oriented trick hitbox (not just its end point). */
+export function segmentIntersectsTrickZoneHitbox(
+  zone: TrickZone,
+  from: WorldPos,
+  to: WorldPos,
+): boolean {
+  if (isPointInTrickZoneHitbox(zone, from) || isPointInTrickZoneHitbox(zone, to)) {
+    return true;
+  }
+  if (from.x === to.x && from.y === to.y) {
+    return false;
+  }
+
+  const { halfAlongRide, halfLateral } = trickZoneHitboxExtents(zone.type, zone.radius);
+  return segmentIntersectsLocalAabb(
+    trickZoneLocalOffset(zone, from),
+    trickZoneLocalOffset(zone, to),
+    halfAlongRide,
+    halfLateral,
+  );
+}

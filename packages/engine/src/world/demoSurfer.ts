@@ -265,6 +265,7 @@ export function tickDemoSurfer(
     next.stats,
     boostActive ? next.trickSpeedBoost : null,
   );
+  const rideStartPosition = { ...next.surfboard.position };
   const moveResult = tickSurfboard(next.surfboard, map, surfInput, effectiveStats);
   next = {
     ...next,
@@ -282,7 +283,7 @@ export function tickDemoSurfer(
   }
 
   if (next.surfboard.speedState !== 'seated') {
-    const zone = findTrickZoneAt(trickZones, next.surfboard.position, tide);
+    const zone = findTrickZoneAt(trickZones, next.surfboard.position, tide, rideStartPosition);
     if (zone && next.activeTrickZoneId !== zone.id) {
       return resolveDemoTrickEntry({ ...next, activeTrickZoneId: zone.id }, zone, map);
     }
