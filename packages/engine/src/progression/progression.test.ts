@@ -145,6 +145,65 @@ describe('progression', () => {
     expect(canPurchaseUnlock(state, unlock!).ok).toBe(false);
   });
 
+  it('blocks demo-disabled unlock purchases', () => {
+    const state = {
+      ...createProgressionState(),
+      coralTokens: 9999,
+      xp: { agility: 1_000_000, sailing: 1_000_000 },
+    };
+    for (const id of ['ebb_and_flow', 'living_coral'] as const) {
+      const unlock = UNLOCK_REGISTRY.find((entry) => entry.id === id);
+      expect(unlock).toBeDefined();
+      const check = canPurchaseUnlock(state, unlock!);
+      expect(check.ok).toBe(false);
+      expect(check.reason).toBe('Disabled for this demo');
+    }
+  });
+
+  it('purchases rosewood board when requirements met', () => {
+    const state = {
+      ...createProgressionState(),
+      coralTokens: 500,
+      xp: { agility: 250_000, sailing: 0 },
+    };
+    const result = purchaseUnlock(state, 'rosewood_board');
+    expect(result.success).toBe(true);
+    expect(result.state.unlocked.has('rosewood_board')).toBe(true);
+    expect(result.state.coralTokens).toBe(0);
+  });
+
+  it('drops Teeny Tai on a 1/500 trick roll', () => {
+    let call = 0;
+    const random = () => {
+      call += 1;
+      return call === 2 ? 0 : 1;
+    };
+    const result = awardTrick(createProgressionState(), random);
+    expect(result.unlockGained).toBe('teeny_tai');
+    expect(result.state.unlocked.has('teeny_tai')).toBe(true);
+  });
+
+  it('does not drop Teeny Tai when already owned', () => {
+    const state = {
+      ...createProgressionState(),
+      unlocked: new Set(['teeny_tai' as const]),
+    };
+    const result = awardTrick(state, () => 0);
+    expect(result.unlockGained).toBeNull();
+    expect(result.state.unlocked.has('teeny_tai')).toBe(true);
+  });
+
+  it('misses Teeny Tai when roll is above drop chance', () => {
+    let call = 0;
+    const random = () => {
+      call += 1;
+      return call === 2 ? 0.01 : 1;
+    };
+    const result = awardTrick(createProgressionState(), random);
+    expect(result.unlockGained).toBeNull();
+    expect(result.state.unlocked.has('teeny_tai')).toBe(false);
+  });
+
   it('round-trips progression through serialization', () => {
     const state = awardTrick(
       {

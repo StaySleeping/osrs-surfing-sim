@@ -194,13 +194,12 @@ export class ThreeRenderer implements IRenderer {
 
     this.mapMeshes.build(map, snapshot.tide);
     this.mapMeshes.updateTideVisuals(map, snapshot.tide);
-    void visualTimeMs;
 
     this.orbitCamera.setFocus(snapshot.surfboard.position.x, snapshot.surfboard.position.y);
     this.orbitCamera.update(deltaSeconds);
 
     this.tricks.sync(snapshot, tickBlend);
-    this.entities.sync(snapshot, map);
+    this.entities.sync(snapshot, map, visualTimeMs);
     this.overlays.sync(snapshot, map);
 
     this.renderer.render(this.scene, this.orbitCamera.camera);

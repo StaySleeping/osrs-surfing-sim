@@ -10,6 +10,7 @@ export const TRICK_XP_SAILING = 35;
 export const CORAL_TOKEN_DROP_CHANCE = 1 / 10;
 export const CORAL_TOKEN_MIN = 6;
 export const CORAL_TOKEN_MAX = 10;
+export const TEENY_TAI_DROP_CHANCE = 1 / 500;
 
 export interface SerializedProgressionState {
   xp: ProgressionState['xp'];
@@ -105,6 +106,9 @@ export function canPurchaseUnlock(
   state: ProgressionState,
   unlock: UnlockDefinition,
 ): { ok: boolean; reason?: string } {
+  if (unlock.demoDisabled) {
+    return { ok: false, reason: 'Disabled for this demo' };
+  }
   if (unlock.earnOnly) {
     return { ok: false, reason: 'Earned through gameplay only' };
   }
@@ -151,6 +155,7 @@ export interface TrickResult {
   state: ProgressionState;
   xpGained: { agility: number; sailing: number };
   tokensGained: number;
+  unlockGained: UnlockId | null;
 }
 
 export function rollCoralTokenDrop(random: () => number = Math.random): number {
@@ -175,6 +180,13 @@ export function awardTrick(
   };
   const tokensGained = rollCoralTokenDrop(random);
 
+  let unlockGained: UnlockId | null = null;
+  const unlocked = new Set(state.unlocked);
+  if (!unlocked.has('teeny_tai') && random() < TEENY_TAI_DROP_CHANCE) {
+    unlocked.add('teeny_tai');
+    unlockGained = 'teeny_tai';
+  }
+
   const next: ProgressionState = {
     ...state,
     xp: {
@@ -182,6 +194,7 @@ export function awardTrick(
       sailing: state.xp.sailing + xpGained.sailing,
     },
     coralTokens: state.coralTokens + tokensGained,
+    unlocked,
     session: {
       tricksLanded: state.session.tricksLanded + 1,
       combo,
@@ -189,7 +202,7 @@ export function awardTrick(
     },
   };
 
-  return { state: next, xpGained, tokensGained };
+  return { state: next, xpGained, tokensGained, unlockGained };
 }
 
 export function decayCombo(state: ProgressionState): ProgressionState {

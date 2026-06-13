@@ -15,7 +15,8 @@ export type UnlockId =
   | 'ebb_and_flow'
   | 'living_coral'
   | 'coral_rail_cosmetic'
-  | 'surf_guru_board';
+  | 'surf_guru_board'
+  | 'rosewood_board';
 
 export interface UnlockDefinition {
   id: UnlockId;
@@ -25,6 +26,7 @@ export interface UnlockDefinition {
   minAgilityLevel?: number;
   minSailingLevel?: number;
   earnOnly?: boolean;
+  demoDisabled?: boolean;
 }
 
 export interface ProgressionState {
@@ -38,7 +40,7 @@ export const UNLOCK_REGISTRY: UnlockDefinition[] = [
   {
     id: 'teeny_tai',
     name: 'Teeny Tai',
-    description: "Miniature wave spirit pet resembling Tai'ura.",
+    description: 'Cute jellyfish spirit in a shimmering water bubble — earned from tricks.',
     tokenCost: null,
     earnOnly: true,
   },
@@ -55,6 +57,7 @@ export const UNLOCK_REGISTRY: UnlockDefinition[] = [
     description: 'Lunar spell — weapon swap grants a boosted attack.',
     tokenCost: 750,
     minSailingLevel: 60,
+    demoDisabled: true,
   },
   {
     id: 'living_coral',
@@ -62,6 +65,7 @@ export const UNLOCK_REGISTRY: UnlockDefinition[] = [
     description: '20% chance to double grinding output.',
     tokenCost: 400,
     minAgilityLevel: 50,
+    demoDisabled: true,
   },
   {
     id: 'coral_rail_cosmetic',
@@ -72,8 +76,15 @@ export const UNLOCK_REGISTRY: UnlockDefinition[] = [
   {
     id: 'surf_guru_board',
     name: 'Ironwood Board',
-    description: 'Tier-2 surfboard cosmetic from the guru.',
+    description: 'Ironwood hull — faster ride speed and darker deck.',
     tokenCost: 300,
     minAgilityLevel: 30,
+  },
+  {
+    id: 'rosewood_board',
+    name: 'Rosewood Board',
+    description: 'Rosewood hull — fastest ride speed and rich deck finish.',
+    tokenCost: 500,
+    minAgilityLevel: 45,
   },
 ];

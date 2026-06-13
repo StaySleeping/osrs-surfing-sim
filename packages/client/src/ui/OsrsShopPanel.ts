@@ -47,7 +47,7 @@ export class OsrsShopPanel {
       const button = this.root.querySelector(
         `[data-unlock="${unlock.id}"]`,
       ) as HTMLButtonElement | null;
-      if (!button || unlock.earnOnly) {
+      if (!button || unlock.earnOnly || unlock.demoDisabled) {
         continue;
       }
       bindUiPress(button, () => this.onPurchase(unlock.id));
@@ -61,14 +61,26 @@ export class OsrsShopPanel {
     const owned = progression.unlocked.has(unlock.id);
     const check = canPurchaseUnlock(progression, unlock);
     const costLabel = unlock.tokenCost === null ? 'Earn only' : `${unlock.tokenCost} Coral Tokens`;
-    const status = owned ? 'Unlocked' : check.ok ? 'Purchase' : (check.reason ?? 'Locked');
+    let status: string;
+    if (owned) {
+      status = 'Unlocked';
+    } else if (unlock.demoDisabled) {
+      status = 'Disabled for this demo';
+    } else if (unlock.earnOnly) {
+      status = 'Earn only';
+    } else if (check.ok) {
+      status = 'Purchase';
+    } else {
+      status = check.reason ?? 'Locked';
+    }
+    const disabled = owned || !check.ok;
 
     return `
       <div class="osrs-shop-item">
         <div class="osrs-shop-item-title">${unlock.name}</div>
         <div class="osrs-shop-item-desc">${unlock.description}</div>
         <div class="osrs-shop-item-cost">${costLabel}</div>
-        <button type="button" class="osrs-stone-btn" data-unlock="${unlock.id}" ${owned || !check.ok ? 'disabled' : ''}>
+        <button type="button" class="osrs-stone-btn" data-unlock="${unlock.id}" ${disabled ? 'disabled' : ''}>
           ${status}
         </button>
       </div>

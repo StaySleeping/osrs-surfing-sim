@@ -4,6 +4,7 @@ import {
   headingToDegrees,
   tideRideSurfaceY,
   type TideState,
+  type UnlockId,
   type WorldMap,
 } from '@osrs-surfing/engine';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'three';
 
 import type { DisplaySimulationSnapshot, DisplayTrickAnimation } from '../visualSnapshot.js';
+import { PetFollower } from './petMeshes.js';
 import { tideSpinBoardPose, trickBoardPose } from './trickAnimationPose.js';
 import { headingToRotationY, radiansToRotationY, tileToWorld3 } from './worldCoords.js';
 
@@ -26,6 +28,12 @@ const PLAYER_HAIR = 0x4a2c12;
 const PLAYER_PANTS = 0x5a4a36;
 const BOARD_WOOD = 0xc9a066;
 const BOARD_STRIPE = 0xf4c542;
+const BOARD_WOOD_IRONWOOD = 0x8a5a2a;
+const BOARD_STRIPE_IRONWOOD = 0xc9a050;
+const BOARD_WOOD_ROSEWOOD = 0x6b3a2a;
+const BOARD_STRIPE_ROSEWOOD = 0xd4a832;
+const CORAL_RAIL_EMISSIVE = 0xff88aa;
+const PET_FOLLOW_DISTANCE = 1.2;
 const NPC_SHIRT = 0xa8442c;
 const NPC_HAIR = 0x5c3a1e;
 const WAKE_PINK = 0xf4a7b9;
@@ -111,6 +119,15 @@ interface SurferRig {
   tilt: Group;
   riderAnchor: Group;
   wake: Group;
+  cosmetics: SurfboardCosmeticRefs;
+}
+
+interface SurfboardCosmeticRefs {
+  deckMat: MeshStandardMaterial;
+  stripeMat: MeshStandardMaterial;
+  finMat: MeshStandardMaterial;
+  railLeft: Mesh;
+  railRight: Mesh;
 }
 
 function makeSurferRig(woodColor: number, stripeColor: number, wake: Group): SurferRig {
@@ -121,9 +138,10 @@ function makeSurferRig(woodColor: number, stripeColor: number, wake: Group): Sur
   tilt.rotation.order = 'YXZ';
   const riderAnchor = new Group();
   riderAnchor.position.y = DECK_TOP_Y;
-  tilt.add(makeSurfboardMesh(woodColor, stripeColor), riderAnchor);
+  const { group: board, cosmetics } = makeSurfboardMesh(woodColor, stripeColor);
+  tilt.add(board, riderAnchor);
   rig.add(tilt);
-  return { rig, tilt, riderAnchor, wake };
+  return { rig, tilt, riderAnchor, wake, cosmetics };
 }
 
 function applySurferPose(parts: SurferRig, rider: Group, pose: BoardRiderPose): void {
@@ -199,13 +217,54 @@ function surfboardDeckGeometry(): ExtrudeGeometry {
   return geometry;
 }
 
-function makeSurfboardMesh(woodColor = BOARD_WOOD, stripeColor = BOARD_STRIPE): Group {
+function makeSurfboardMesh(
+  woodColor = BOARD_WOOD,
+  stripeColor = BOARD_STRIPE,
+): { group: Group; cosmetics: SurfboardCosmeticRefs } {
   const group = new Group();
-  const deck = new Mesh(surfboardDeckGeometry(), flatMaterial(woodColor, 0.8));
-  const stripe = boxMesh(0.95, 0.02, 0.09, stripeColor, 0, 0.04, 0);
-  const fin = boxMesh(0.1, 0.12, 0.03, woodColor, -0.48, -0.08, 0);
-  group.add(deck, stripe, fin);
-  return group;
+  const deckMat = flatMaterial(woodColor, 0.8);
+  const deck = new Mesh(surfboardDeckGeometry(), deckMat);
+  const stripeMat = flatMaterial(stripeColor);
+  const stripe = new Mesh(new BoxGeometry(0.95, 0.02, 0.09), stripeMat);
+  stripe.position.set(0, 0.04, 0);
+  const finMat = flatMaterial(woodColor, 0.8);
+  const fin = new Mesh(new BoxGeometry(0.1, 0.12, 0.03), finMat);
+  fin.position.set(-0.48, -0.08, 0);
+  const railMat = new MeshStandardMaterial({
+    color: CORAL_RAIL_EMISSIVE,
+    emissive: CORAL_RAIL_EMISSIVE,
+    emissiveIntensity: 0.85,
+    flatShading: true,
+  });
+  const railLeft = new Mesh(new BoxGeometry(0.92, 0.025, 0.02), railMat);
+  railLeft.position.set(0, 0.055, -0.21);
+  railLeft.visible = false;
+  const railRight = new Mesh(new BoxGeometry(0.92, 0.025, 0.02), railMat);
+  railRight.position.set(0, 0.055, 0.21);
+  railRight.visible = false;
+  group.add(deck, stripe, fin, railLeft, railRight);
+  return {
+    group,
+    cosmetics: { deckMat, stripeMat, finMat, railLeft, railRight },
+  };
+}
+
+function applyPlayerCosmetics(cosmetics: SurfboardCosmeticRefs, unlocked: Set<UnlockId>): void {
+  let wood = BOARD_WOOD;
+  let stripe = BOARD_STRIPE;
+  if (unlocked.has('rosewood_board')) {
+    wood = BOARD_WOOD_ROSEWOOD;
+    stripe = BOARD_STRIPE_ROSEWOOD;
+  } else if (unlocked.has('surf_guru_board')) {
+    wood = BOARD_WOOD_IRONWOOD;
+    stripe = BOARD_STRIPE_IRONWOOD;
+  }
+  cosmetics.deckMat.color.setHex(wood);
+  cosmetics.finMat.color.setHex(wood);
+  cosmetics.stripeMat.color.setHex(stripe);
+  const showRails = unlocked.has('coral_rail_cosmetic');
+  cosmetics.railLeft.visible = showRails;
+  cosmetics.railRight.visible = showRails;
 }
 
 function makePlayerMesh(): Group {
@@ -280,16 +339,27 @@ export class EntityLayer {
     BOARD_STRIPE,
     makeWakeMesh(PLAYER_WAKE_OUTER_OPACITY, PLAYER_WAKE_INNER_OPACITY),
   );
-  private readonly dockBoard = makeSurfboardMesh();
+  private readonly dockBoardMesh = makeSurfboardMesh();
   private readonly player = makePlayerMesh();
+  private readonly pet = new PetFollower();
   private readonly demoSurferPool: DemoSurferVisual[] = [];
   private readonly npcPool: Group[] = [];
 
   constructor() {
-    this.root.add(this.playerParts.rig, this.playerParts.wake, this.dockBoard, this.player);
+    this.root.add(
+      this.playerParts.rig,
+      this.playerParts.wake,
+      this.dockBoardMesh.group,
+      this.player,
+      this.pet.root,
+    );
   }
 
-  sync(snapshot: DisplaySimulationSnapshot, map: WorldMap): void {
+  sync(snapshot: DisplaySimulationSnapshot, map: WorldMap, visualTimeMs = 0): void {
+    const unlocked = snapshot.progression.unlocked;
+    applyPlayerCosmetics(this.playerParts.cosmetics, unlocked);
+    applyPlayerCosmetics(this.dockBoardMesh.cosmetics, unlocked);
+    const hasPet = unlocked.has('teeny_tai');
     const tile = getTile(
       map,
       Math.floor(snapshot.surfboard.position.x),
@@ -310,10 +380,12 @@ export class EntityLayer {
     const boardY = riderPose.boardY;
 
     this.playerParts.rig.visible = snapshot.boardMounted;
-    this.dockBoard.visible = !snapshot.boardMounted;
+    this.dockBoardMesh.group.visible = !snapshot.boardMounted;
     this.player.visible = true;
     this.syncNpcs(snapshot, map);
     this.syncDemoSurfers(snapshot);
+
+    const walkHeadingRad = (headingToDegrees(snapshot.surfboard.currentHeading) * Math.PI) / 180;
 
     if (!snapshot.boardMounted) {
       const dockPos = tileToWorld3(snapshot.boardDockX, snapshot.boardDockY);
@@ -332,8 +404,8 @@ export class EntityLayer {
               walkTile,
             )
           : dockY;
-      this.dockBoard.position.set(dockPos.x, dockY, dockPos.z);
-      this.dockBoard.rotation.set(0, 0, 0);
+      this.dockBoardMesh.group.position.set(dockPos.x, dockY, dockPos.z);
+      this.dockBoardMesh.group.rotation.set(0, 0, 0);
 
       if (this.player.parent !== this.root) {
         this.root.add(this.player);
@@ -342,6 +414,15 @@ export class EntityLayer {
       this.player.rotation.set(0, headingToRotationY(snapshot.surfboard.currentHeading), 0);
       this.player.scale.y = 1;
       this.playerParts.wake.visible = false;
+
+      const behindWalk = walkHeadingRad + Math.PI;
+      this.pet.sync(
+        hasPet,
+        walkPos.x + Math.cos(behindWalk) * PET_FOLLOW_DISTANCE,
+        walkY + 0.5,
+        walkPos.z + Math.sin(behindWalk) * PET_FOLLOW_DISTANCE,
+        visualTimeMs,
+      );
       return;
     }
 
@@ -369,6 +450,15 @@ export class EntityLayer {
         PLAYER_WAKE_INNER_OPACITY,
       );
     }
+
+    const behindRide = headingRad + Math.PI;
+    this.pet.sync(
+      hasPet,
+      riderPose.worldX + Math.cos(behindRide) * PET_FOLLOW_DISTANCE,
+      boardY + 0.25,
+      riderPose.worldZ + Math.sin(behindRide) * PET_FOLLOW_DISTANCE,
+      visualTimeMs,
+    );
   }
 
   private syncDemoSurfers(snapshot: DisplaySimulationSnapshot): void {
@@ -450,6 +540,7 @@ export class EntityLayer {
   }
 
   dispose(): void {
+    this.pet.dispose();
     this.root.traverse((child) => {
       if (child instanceof Mesh) {
         child.geometry.dispose();
