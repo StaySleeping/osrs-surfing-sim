@@ -6,6 +6,7 @@ import {
   decayCombo,
   purchaseUnlock,
 } from '../progression/progression.js';
+import { surfboardStatsForUnlocks } from '../progression/surfboardUnlocks.js';
 import type { ProgressionState, UnlockId } from '../progression/types.js';
 import { type OnFootWalkState, planWalkPath, tickOnFootPath } from '../movement/onFoot.js';
 import { headingFromClick } from '../movement/surfboard.js';
@@ -156,6 +157,9 @@ export class GameSimulation {
     this.progression = config.initialProgression
       ? cloneProgressionState(config.initialProgression)
       : createProgressionState();
+    if (!config.stats) {
+      this.stats = surfboardStatsForUnlocks(this.progression.unlocked);
+    }
     this.trickZones = config.arena.trickZones.map((zone) => ({ ...zone }));
     this.tide = config.arena.tide ? createTideState(config.arena.tide) : null;
     this.trickZoneTideSync = createTrickZoneTideSyncState();
@@ -460,6 +464,11 @@ export class GameSimulation {
 
     const result = awardTrick(this.progression);
     this.progression = result.state;
+    if (result.unlockGained === 'teeny_tai') {
+      this.pendingDialogue.push(
+        'A tiny jellyfish spirit appears in a shimmering bubble — Teeny Tai joins you!',
+      );
+    }
     this.trickZones = markZoneTricked(this.trickZones, zone.id);
     this.trickSpeedBoost = refreshTrickSpeedBoost();
     this.trickAnimation = createTrickAnimationState(
@@ -527,6 +536,7 @@ export class GameSimulation {
     const outcome = purchaseUnlock(this.progression, unlockId);
     if (outcome.success) {
       this.progression = outcome.state;
+      this.stats = surfboardStatsForUnlocks(this.progression.unlocked);
       return null;
     }
     return outcome.reason ?? 'Purchase failed';

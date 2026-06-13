@@ -16,8 +16,11 @@ export const SPEED_STAT_TO_TILES_PER_TICK = 2;
 /** Teak-tier pace while lying down / paddling out (tiles per tick). */
 export const HULL_SPEED_PADDLE_TILES_PER_TICK = 2;
 
-/** Camphor and ironwood hull base speed (tiles per tick). */
+/** Camphor hull base speed (tiles per tick). */
 export const HULL_SPEED_CAMPHOR_TILES_PER_TICK = 2.5;
+
+/** Ironwood hull ride speed upgrade (tiles per tick). */
+export const HULL_SPEED_IRONWOOD_TILES_PER_TICK = 2.75;
 
 /** Rosewood hull base speed (tiles per tick). */
 export const HULL_SPEED_ROSEWOOD_TILES_PER_TICK = 3;
@@ -33,6 +36,7 @@ export function speedStatToTilesPerTick(speedStat: number): number {
 /** Default board: camphor hull ride speed, teak-tier paddle speed. */
 export const SPEED_PADDLE = tilesPerTickToSpeedStat(HULL_SPEED_PADDLE_TILES_PER_TICK);
 export const SPEED_RIDE = tilesPerTickToSpeedStat(HULL_SPEED_CAMPHOR_TILES_PER_TICK);
+export const SPEED_RIDE_IRONWOOD = tilesPerTickToSpeedStat(HULL_SPEED_IRONWOOD_TILES_PER_TICK);
 export const SPEED_RIDE_ROSEWOOD = tilesPerTickToSpeedStat(HULL_SPEED_ROSEWOOD_TILES_PER_TICK);
 
 export const DEFAULT_SURFBOARD_STATS = {
