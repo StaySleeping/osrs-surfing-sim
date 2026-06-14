@@ -2,5 +2,13 @@ node_modules
 dist
 *.local
 .DS_Store
+.env
+.env.*
+*.tsbuildinfo
+.vite
+.claude
+.playwright-mcp
+build.logs
+/*.png
 packages/client/test-results
 packages/client/playwright-report
