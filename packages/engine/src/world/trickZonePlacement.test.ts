@@ -207,6 +207,11 @@ describe('pickRandomTrickType', () => {
     expect(pickRandomTrickType(() => 0)).toBe('rail');
     expect(pickRandomTrickType(() => 0.99)).toBe('wall_ride');
   });
+
+  it('never returns an excluded type', () => {
+    expect(pickRandomTrickType(() => 0, ['rail'])).toBe('tunnel');
+    expect(pickRandomTrickType(() => 0, ['jump', 'rail'])).toBe('tunnel');
+  });
 });
 
 describe('trickZoneRotationRadians', () => {
