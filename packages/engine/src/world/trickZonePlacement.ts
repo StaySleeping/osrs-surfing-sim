@@ -128,8 +128,16 @@ export function isFarEnoughFromZones(
   return true;
 }
 
-export function pickRandomTrickType(random: () => number = Math.random): TrickFeatureType {
-  return TRICK_FEATURE_TYPES[Math.floor(random() * TRICK_FEATURE_TYPES.length)];
+export function pickRandomTrickType(
+  random: () => number = Math.random,
+  excludeTypes: readonly TrickFeatureType[] = [],
+): TrickFeatureType {
+  const pool =
+    excludeTypes.length === 0
+      ? TRICK_FEATURE_TYPES
+      : TRICK_FEATURE_TYPES.filter((type) => !excludeTypes.includes(type));
+  const choices = pool.length > 0 ? pool : TRICK_FEATURE_TYPES;
+  return choices[Math.floor(random() * choices.length)];
 }
 
 /** Spawn a trick feature on the reef ring at the given polar angle and radial depth. */
@@ -143,6 +151,7 @@ export function createTrickZoneAtAngle(
   random: () => number = Math.random,
   enforceGap = true,
   allowSubmerged = false,
+  excludeTypes: readonly TrickFeatureType[] = [],
 ): TrickZone | null {
   const center = reefCenterAtAngle(map, positionAngle, ringDepth);
   if (!center || (enforceGap && !isFarEnoughFromZones(center, existingZones))) {
@@ -152,7 +161,7 @@ export function createTrickZoneAtAngle(
     return null;
   }
 
-  const type = pickRandomTrickType(random);
+  const type = pickRandomTrickType(random, excludeTypes);
   const counterRide = random() < COUNTER_RIDE_CHANCE;
   const rotationRadians = trickZoneRotationRadians(positionAngle, counterRide);
 
@@ -176,6 +185,7 @@ function spawnTrickZoneAtSlot(
   existingZones: TrickZone[],
   random: () => number,
   allowSubmerged: boolean,
+  excludeTypes: readonly TrickFeatureType[] = [],
 ): TrickZone | null {
   for (let attempt = 0; attempt < RING_DEPTH_SPAWN_ATTEMPTS; attempt += 1) {
     const spawned = createTrickZoneAtAngle(
@@ -188,6 +198,7 @@ function spawnTrickZoneAtSlot(
       random,
       true,
       allowSubmerged,
+      excludeTypes,
     );
     if (spawned) {
       return spawned;
@@ -210,6 +221,7 @@ export function syncTrickZonesWithTide(
 ): TrickZone[] {
   const slotTolerance = (TAU / targetCount) * 0.35;
   const active: TrickZone[] = [];
+  const purgedTypeBySlot = new Map<number, TrickFeatureType>();
 
   for (const zone of zones) {
     const zoneAngle = zonePolarAngle(zone, tide);
@@ -220,6 +232,7 @@ export function syncTrickZonesWithTide(
     }
 
     if (isPastHighTideReroll(zoneAngle, tide) && !zone.spawnedAtHighTide) {
+      purgedTypeBySlot.set(nearestSlotIndex(zoneAngle, targetCount), zone.type);
       continue;
     }
 
@@ -240,6 +253,16 @@ export function syncTrickZonesWithTide(
       continue;
     }
 
+    const excludeTypes: TrickFeatureType[] = [];
+    const purgedType = purgedTypeBySlot.get(slot);
+    if (purgedType) {
+      excludeTypes.push(purgedType);
+    }
+    const prevSlotType = typeAtSlot(active, tide, slot, targetCount, slotTolerance, -1);
+    if (prevSlotType) {
+      excludeTypes.push(prevSlotType);
+    }
+
     const spawned = spawnTrickZoneAtSlot(
       map,
       slotAngle,
@@ -248,6 +271,7 @@ export function syncTrickZonesWithTide(
       active,
       random,
       true,
+      excludeTypes,
     );
 
     if (!spawned) {
@@ -268,11 +292,29 @@ function isSlotOccupied(
   targetCount: number,
   tolerance: number,
 ): boolean {
-  const slotAngle = trickSlotAngle(slot, targetCount);
-  return zones.some((zone) => {
+  return typeAtSlot(zones, tide, slot, targetCount, tolerance, 0) !== undefined;
+}
+
+function typeAtSlot(
+  zones: TrickZone[],
+  tide: TideState,
+  slot: number,
+  targetCount: number,
+  tolerance: number,
+  slotOffset: number,
+): TrickFeatureType | undefined {
+  const slotAngle = trickSlotAngle((slot + slotOffset + targetCount) % targetCount, targetCount);
+  const match = zones.find((zone) => {
     const zoneAngle = zonePolarAngle(zone, tide);
     return angleNear(zoneAngle, slotAngle, tolerance);
   });
+  return match?.type;
+}
+
+function nearestSlotIndex(angle: number, targetCount: number): number {
+  const step = TAU / targetCount;
+  const index = Math.round(normalizeSpawnAngle(angle - TRICK_SLOT_OFFSET) / step);
+  return ((index % targetCount) + targetCount) % targetCount;
 }
 
 function angleNear(a: number, b: number, tolerance: number): boolean {
