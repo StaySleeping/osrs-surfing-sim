@@ -52,13 +52,26 @@ interface DemoSurferStyle {
   boardStripe: number;
 }
 
-/** Distinct outfits per demo surfer, assigned by snapshot order. */
+/**
+ * Distinct outfits per demo surfer, assigned by snapshot order
+ * (Nalu, Kai, Hina, Tama, Koa). Board woods match their pace tiers.
+ */
 const DEMO_SURFER_STYLES: DemoSurferStyle[] = [
-  { shirt: 0x2d8a6e, hair: 0x2a1810, boardWood: 0xb8884a, boardStripe: 0xe8d44a },
-  { shirt: 0x8a2d4e, hair: 0x1c120c, boardWood: 0xc9a066, boardStripe: 0x66c2e8 },
-  { shirt: 0x6a5fb5, hair: 0x3a2a18, boardWood: 0x9a7a4a, boardStripe: 0xf4a7b9 },
-  { shirt: 0xc2a23c, hair: 0x241a10, boardWood: 0xb8884a, boardStripe: 0x8fe07a },
-  { shirt: 0xe05038, hair: 0x14100c, boardWood: 0xf2ead8, boardStripe: 0xe04848 },
+  // Nalu — ironwood reef looper
+  { shirt: 0x2d8a6e, hair: 0x2a1810, boardWood: BOARD_WOOD_IRONWOOD, boardStripe: 0xe8d44a },
+  // Kai — ironwood sector patrol
+  { shirt: 0x8a2d4e, hair: 0x1c120c, boardWood: BOARD_WOOD_IRONWOOD, boardStripe: 0x66c2e8 },
+  // Hina — light camphor leisure cruise
+  { shirt: 0x6a5fb5, hair: 0x3a2a18, boardWood: 0xd2b48c, boardStripe: 0xf4a7b9 },
+  // Tama — weathered camphor explorer
+  { shirt: 0xc2a23c, hair: 0x241a10, boardWood: BOARD_WOOD, boardStripe: 0x8fe07a },
+  // Koa — rosewood show-off
+  {
+    shirt: 0xe05038,
+    hair: 0x14100c,
+    boardWood: BOARD_WOOD_ROSEWOOD,
+    boardStripe: BOARD_STRIPE_ROSEWOOD,
+  },
 ];
 
 /** Deck surface height within the rig — rider feet rest here. */

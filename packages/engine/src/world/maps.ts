@@ -20,7 +20,10 @@ import {
   SHOWOFF_FOLLOW_DISTANCE,
   type DemoSurferBehavior,
 } from '../ai/demoSurferAi.js';
-import { HULL_SPEED_CAMPHOR_TILES_PER_TICK } from '../constants/movement.js';
+import {
+  HULL_SPEED_CAMPHOR_TILES_PER_TICK,
+  HULL_SPEED_IRONWOOD_TILES_PER_TICK,
+} from '../constants/movement.js';
 import type { DemoSurferConfig } from './demoSurfer.js';
 import type { TideConfig, TrickZone } from './features.js';
 import type { NpcDefinition } from './npc.js';
@@ -111,12 +114,27 @@ const KAI_RING_DEPTH = 0.45;
 const HINA_RING_DEPTH = 0.82;
 
 /**
- * Koa shows off in front of the camera. Cruise is slightly above rosewood
- * (3.2 vs 3.0 tiles/tick); post-trick boost still applies on top.
+ * Demo board paces (tiles/tick) vs player hulls:
+ * paddle 2.0 · camphor 2.5 · ironwood 2.75 · rosewood 3.0
  */
+const NALU_CRUISE_TILES_PER_TICK = HULL_SPEED_IRONWOOD_TILES_PER_TICK;
+const KAI_CRUISE_TILES_PER_TICK = HULL_SPEED_IRONWOOD_TILES_PER_TICK;
+/** Leisurely outer-line cruise — between paddle and camphor. */
+const HINA_CRUISE_TILES_PER_TICK = 2.2;
+/** Explorer wander pace — a touch under camphor. */
+const TAMA_CRUISE_TILES_PER_TICK = 2.35;
+/** Show-off cruise — slightly above rosewood; post-trick boost still applies. */
 const KOA_CRUISE_TILES_PER_TICK = 3.2;
-const KOA_SPEED_MULTIPLIER = KOA_CRUISE_TILES_PER_TICK / HULL_SPEED_CAMPHOR_TILES_PER_TICK;
-/** Extra turn tightness on top of the speed scale (smaller radius). */
+
+function cruiseSpeedMultiplier(tilesPerTick: number): number {
+  return tilesPerTick / HULL_SPEED_CAMPHOR_TILES_PER_TICK;
+}
+
+/** Extra turn scale on top of speedMultiplier (1 = same relative turn as camphor). */
+const NALU_TURN_RATE_MULTIPLIER = 1.1;
+const KAI_TURN_RATE_MULTIPLIER = 1.25;
+const HINA_TURN_RATE_MULTIPLIER = 0.85;
+const TAMA_TURN_RATE_MULTIPLIER = 0.9;
 const KOA_TURN_RATE_MULTIPLIER = 1.35;
 
 function buildDemoSurfers(): DemoSurferConfig[] {
@@ -133,6 +151,8 @@ function buildDemoSurfers(): DemoSurferConfig[] {
       name: 'Nalu',
       spawnAngle: -Math.PI / 4,
       behavior: { kind: 'loop', ringDepth: DEMO_SURFER_RING_DEPTH, doesTricks: true },
+      speedMultiplier: cruiseSpeedMultiplier(NALU_CRUISE_TILES_PER_TICK),
+      turnRateMultiplier: NALU_TURN_RATE_MULTIPLIER,
     },
     {
       id: 'kai',
@@ -145,25 +165,31 @@ function buildDemoSurfers(): DemoSurferConfig[] {
         ringDepth: KAI_RING_DEPTH,
         doesTricks: true,
       },
+      speedMultiplier: cruiseSpeedMultiplier(KAI_CRUISE_TILES_PER_TICK),
+      turnRateMultiplier: KAI_TURN_RATE_MULTIPLIER,
     },
     {
       id: 'hina',
       name: 'Hina',
       spawnAngle: (-Math.PI * 3) / 4,
       behavior: { kind: 'loop', ringDepth: HINA_RING_DEPTH, doesTricks: false },
+      speedMultiplier: cruiseSpeedMultiplier(HINA_CRUISE_TILES_PER_TICK),
+      turnRateMultiplier: HINA_TURN_RATE_MULTIPLIER,
     },
     {
       id: 'tama',
       name: 'Tama',
       spawnAngle: Math.PI,
       behavior: { kind: 'explorer' },
+      speedMultiplier: cruiseSpeedMultiplier(TAMA_CRUISE_TILES_PER_TICK),
+      turnRateMultiplier: TAMA_TURN_RATE_MULTIPLIER,
     },
     {
       id: 'koa',
       name: 'Koa',
       spawnAngle: Math.PI / 2 + 0.4,
       behavior: { kind: 'showoff', followDistance: SHOWOFF_FOLLOW_DISTANCE },
-      speedMultiplier: KOA_SPEED_MULTIPLIER,
+      speedMultiplier: cruiseSpeedMultiplier(KOA_CRUISE_TILES_PER_TICK),
       turnRateMultiplier: KOA_TURN_RATE_MULTIPLIER,
     },
   ];

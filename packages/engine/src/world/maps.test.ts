@@ -99,6 +99,14 @@ describe('createCoralParkSlice', () => {
     for (const surfer of arena.demoSurfers) {
       expect(mapTile(arena.map, surfer.startX, surfer.startY)).toBe('coral_rideable');
     }
+    const cruiseById = Object.fromEntries(
+      arena.demoSurfers.map((surfer) => [surfer.id, surfer.speedMultiplier ?? 1]),
+    );
+    expect(cruiseById.koa).toBeGreaterThan(cruiseById.nalu);
+    expect(cruiseById.nalu).toBe(cruiseById.kai);
+    expect(cruiseById.nalu).toBeGreaterThan(cruiseById.tama);
+    expect(cruiseById.tama).toBeGreaterThan(cruiseById.hina);
+    expect(cruiseById.hina).toBeLessThan(1);
     expect(arena.trickZones.length).toBeGreaterThanOrEqual(12);
     expect(arena.map.widthTiles).toBeGreaterThanOrEqual(280);
 
