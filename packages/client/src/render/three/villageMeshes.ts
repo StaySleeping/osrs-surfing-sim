@@ -19,6 +19,9 @@ const THATCH = 0x9b7c3c;
 const THATCH_RIDGE = 0x7a5c28;
 const POST_WOOD = 0x6b4a2a;
 const PLATFORM_WOOD = 0xb89468;
+const CANOE_WOOD = 0x8a6238;
+const PALM_TRUNK = 0x6b4a2a;
+const PALM_FROND = 0x3d7a3a;
 
 /** Decorative fale spots: polar angle and how far out along the grass radius. */
 const HUT_SPOTS = [
@@ -55,7 +58,12 @@ function makeFale(footprint: number): Group {
         flatMaterial(POST_WOOD),
       );
       post.position.set(sx * halfX * 0.85, platformHeight + postHeight / 2, sz * halfZ * 0.85);
-      group.add(post);
+      const collar = new Mesh(
+        new BoxGeometry(footprint * 0.08, footprint * 0.04, footprint * 0.08),
+        flatMaterial(POST_WOOD),
+      );
+      collar.position.set(sx * halfX * 0.85, platformHeight + postHeight * 0.92, sz * halfZ * 0.85);
+      group.add(post, collar);
     }
   }
 
@@ -74,6 +82,40 @@ function makeFale(footprint: number): Group {
   ridge.position.y = roofBaseY + roofHeight + roofHeight * 0.1;
   group.add(ridge);
 
+  const ridgeBeam = new Mesh(
+    new BoxGeometry(footprint * 0.9, footprint * 0.04, footprint * 0.06),
+    flatMaterial(THATCH_RIDGE),
+  );
+  ridgeBeam.position.y = roofBaseY + roofHeight * 0.85;
+  group.add(ridgeBeam);
+
+  return group;
+}
+
+function makeCanoe(): Group {
+  const group = new Group();
+  const hull = new Mesh(new BoxGeometry(2.4, 0.22, 0.55), flatMaterial(CANOE_WOOD));
+  hull.position.y = 0.12;
+  const prow = new Mesh(new BoxGeometry(0.35, 0.18, 0.28), flatMaterial(CANOE_WOOD));
+  prow.position.set(1.25, 0.18, 0);
+  const thwart = new Mesh(new BoxGeometry(0.08, 0.06, 0.5), flatMaterial(POST_WOOD));
+  thwart.position.set(0, 0.26, 0);
+  group.add(hull, prow, thwart);
+  return group;
+}
+
+function makePalm(): Group {
+  const group = new Group();
+  const trunk = new Mesh(new CylinderGeometry(0.08, 0.12, 2.2, 5), flatMaterial(PALM_TRUNK));
+  trunk.position.y = 1.1;
+  group.add(trunk);
+  for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+    const frond = new Mesh(new ConeGeometry(0.55, 0.9, 4), flatMaterial(PALM_FROND));
+    frond.position.set(Math.cos(angle) * 0.35, 2.15, Math.sin(angle) * 0.35);
+    frond.rotation.z = Math.cos(angle) * 0.9;
+    frond.rotation.x = Math.sin(angle) * 0.9;
+    group.add(frond);
+  }
   return group;
 }
 
@@ -93,6 +135,29 @@ export function buildVillage(): Group {
     fale.rotation.y = -spot.facing + Math.PI / 2;
     village.add(fale);
   }
+
+  const canoeAngle = Math.PI / 2 + 0.1;
+  const canoeRadius = coralParkGrassRadius(canoeAngle) * 0.72;
+  const canoeTileX = CORAL_PARK_ISLAND_CX + Math.cos(canoeAngle) * canoeRadius;
+  const canoeTileY = CORAL_PARK_ISLAND_CY + Math.sin(canoeAngle) * canoeRadius;
+  const canoeWorld = tileToWorld3(canoeTileX, canoeTileY);
+  const canoe = makeCanoe();
+  canoe.position.set(
+    canoeWorld.x,
+    coralParkLandSurfaceY(canoeTileX, canoeTileY, 'grass'),
+    canoeWorld.z,
+  );
+  canoe.rotation.y = -canoeAngle;
+  village.add(canoe);
+
+  const palmAngle = -2.4;
+  const palmRadius = coralParkGrassRadius(palmAngle) * 0.48;
+  const palmTileX = CORAL_PARK_ISLAND_CX + Math.cos(palmAngle) * palmRadius;
+  const palmTileY = CORAL_PARK_ISLAND_CY + Math.sin(palmAngle) * palmRadius;
+  const palmWorld = tileToWorld3(palmTileX, palmTileY);
+  const palm = makePalm();
+  palm.position.set(palmWorld.x, coralParkLandSurfaceY(palmTileX, palmTileY, 'grass'), palmWorld.z);
+  village.add(palm);
 
   return village;
 }

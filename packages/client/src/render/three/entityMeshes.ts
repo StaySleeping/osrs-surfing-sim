@@ -184,6 +184,7 @@ function makeHumanoidMesh(colors: HumanoidColors, scale = 1): Group {
     boxMesh(0.09, 0.18, 0.08, colors.pants, 0, 0.09, -0.055),
     boxMesh(0.09, 0.18, 0.08, colors.pants, 0, 0.09, 0.055),
     boxMesh(0.13, 0.24, 0.22, colors.shirt, 0, 0.3, 0),
+    boxMesh(0.14, 0.04, 0.23, colors.shirt, 0, 0.4, 0),
     boxMesh(0.08, 0.2, 0.07, colors.shirt, 0, 0.32, -0.145),
     boxMesh(0.08, 0.2, 0.07, colors.shirt, 0, 0.32, 0.145),
     boxMesh(0.06, 0.05, 0.06, PLAYER_SKIN, 0, 0.195, -0.145),
@@ -191,7 +192,10 @@ function makeHumanoidMesh(colors: HumanoidColors, scale = 1): Group {
     boxMesh(0.12, 0.13, 0.12, PLAYER_SKIN, 0, 0.485, 0),
   );
   if (colors.hair !== null) {
-    group.add(boxMesh(0.13, 0.05, 0.13, colors.hair, -0.005, 0.565, 0));
+    group.add(
+      boxMesh(0.13, 0.05, 0.13, colors.hair, -0.005, 0.565, 0),
+      boxMesh(0.08, 0.06, 0.12, colors.hair, -0.04, 0.55, 0),
+    );
   }
   group.scale.setScalar(scale);
   return group;
@@ -227,6 +231,12 @@ function makeSurfboardMesh(
   const stripeMat = flatMaterial(stripeColor);
   const stripe = new Mesh(new BoxGeometry(0.95, 0.02, 0.09), stripeMat);
   stripe.position.set(0, 0.04, 0);
+  const stripeTip = new Mesh(new BoxGeometry(0.12, 0.015, 0.05), stripeMat);
+  stripeTip.position.set(0.52, 0.045, 0);
+  const noseTip = new Mesh(new BoxGeometry(0.08, 0.04, 0.06), flatMaterial(woodColor, 0.8));
+  noseTip.position.set(0.66, 0.01, 0);
+  const tailBlock = new Mesh(new BoxGeometry(0.1, 0.05, 0.22), flatMaterial(woodColor, 0.8));
+  tailBlock.position.set(-0.58, 0.01, 0);
   const finMat = flatMaterial(woodColor, 0.8);
   const fin = new Mesh(new BoxGeometry(0.1, 0.12, 0.03), finMat);
   fin.position.set(-0.48, -0.08, 0);
@@ -242,7 +252,7 @@ function makeSurfboardMesh(
   const railRight = new Mesh(new BoxGeometry(0.92, 0.025, 0.02), railMat);
   railRight.position.set(0, 0.055, 0.21);
   railRight.visible = false;
-  group.add(deck, stripe, fin, railLeft, railRight);
+  group.add(deck, stripe, stripeTip, noseTip, tailBlock, fin, railLeft, railRight);
   return {
     group,
     cosmetics: { deckMat, stripeMat, finMat, railLeft, railRight },

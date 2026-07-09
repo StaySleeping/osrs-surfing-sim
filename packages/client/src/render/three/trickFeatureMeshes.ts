@@ -207,27 +207,52 @@ function buildRailGroup(
 ): Group {
   const group = new Group();
   const barY = radius * 0.24;
-  const bar = new Mesh(
-    new BoxGeometry(radius * 2.3, radius * 0.08, radius * 0.12),
-    makeMaterial(palette.accent, alpha),
+  const barHeight = radius * 0.08;
+  const barDepth = radius * 0.12;
+  const segmentHalf = radius * 0.38;
+  const segmentGap = radius * 0.04;
+
+  for (const sx of [-1, 0, 1]) {
+    const segment = new Mesh(
+      new BoxGeometry(segmentHalf * 2 - segmentGap, barHeight, barDepth),
+      makeMaterial(palette.accent, alpha),
+    );
+    segment.position.set(sx * (segmentHalf + segmentGap * 0.5), barY, 0);
+    group.add(segment);
+  }
+
+  const midSupport = new Mesh(
+    new BoxGeometry(radius * 0.12, barY * 0.85, radius * 0.12),
+    makeMaterial(palette.base, alpha),
   );
-  bar.position.y = barY;
+  midSupport.position.set(0, (barY * 0.85) / 2, 0);
+  group.add(midSupport);
 
   for (const side of [-1, 1]) {
+    const postX = side * radius * 0.85;
     const post = new Mesh(
       new BoxGeometry(radius * 0.14, barY, radius * 0.14),
       makeMaterial(palette.base, alpha),
     );
-    post.position.set(side * radius * 0.85, barY / 2, 0);
+    post.position.set(postX, barY / 2, 0);
     const foot = new Mesh(
       new BoxGeometry(radius * 0.3, radius * 0.06, radius * 0.3),
       makeMaterial(palette.base, alpha),
     );
-    foot.position.set(side * radius * 0.85, radius * 0.03, 0);
-    group.add(post, foot);
+    foot.position.set(postX, radius * 0.03, 0);
+    const knob = new Mesh(
+      new BoxGeometry(radius * 0.1, radius * 0.1, radius * 0.1),
+      makeMaterial(palette.accent, alpha),
+    );
+    knob.position.set(postX, barY * 0.55, radius * 0.1);
+    const barnacle = new Mesh(
+      new BoxGeometry(radius * 0.08, radius * 0.08, radius * 0.08),
+      makeMaterial(palette.base, alpha),
+    );
+    barnacle.position.set(postX + side * radius * 0.08, barY * 0.28, -radius * 0.09);
+    group.add(post, foot, knob, barnacle);
   }
 
-  group.add(bar);
   return group;
 }
 
@@ -237,20 +262,37 @@ function buildTunnelGroup(
   alpha: number,
 ): Group {
   const group = new Group();
+  const major = radius * TUNNEL_TORUS_MAJOR_RADIUS_FACTOR;
+  const tube = radius * TUNNEL_TORUS_TUBE_RADIUS_FACTOR;
+  const baseY = radius * TUNNEL_TORUS_BASE_Y_FACTOR;
   const arch = new Mesh(
-    new TorusGeometry(
-      radius * TUNNEL_TORUS_MAJOR_RADIUS_FACTOR,
-      radius * TUNNEL_TORUS_TUBE_RADIUS_FACTOR,
-      6,
-      12,
-      Math.PI,
-    ),
+    new TorusGeometry(major, tube, 6, 12, Math.PI),
     makeMaterial(palette.accent, alpha),
   );
   // Half-torus in the XY plane — bore is +Z; stretch that axis into a long ride-through tube.
   arch.scale.set(1, 1, TUNNEL_TORUS_LENGTH_SCALE);
-  arch.position.y = radius * TUNNEL_TORUS_BASE_Y_FACTOR;
+  arch.position.y = baseY;
   group.add(arch);
+
+  const mouthZ = major * TUNNEL_TORUS_LENGTH_SCALE * 0.92;
+  for (const zSign of [-1, 1]) {
+    const mouth = new Mesh(
+      new TorusGeometry(major * 0.98, tube * 0.55, 5, 10, Math.PI),
+      makeMaterial(palette.base, alpha),
+    );
+    mouth.position.set(0, baseY, zSign * mouthZ);
+    group.add(mouth);
+  }
+
+  for (const angle of [0.35, 0.9, Math.PI - 0.35, Math.PI - 0.9]) {
+    const growth = new Mesh(
+      new BoxGeometry(radius * 0.1, radius * 0.1, radius * 0.1),
+      makeMaterial(palette.base, alpha),
+    );
+    growth.position.set(Math.cos(angle) * major, baseY + Math.sin(angle) * major, 0);
+    group.add(growth);
+  }
+
   // Meshes are built along +Z; align with reef tangent (rails use +X).
   group.rotation.y = Math.PI / 2;
   return group;
@@ -292,6 +334,40 @@ function buildJumpGroup(
 ): Group {
   const group = new Group();
   group.add(buildJumpRamp(radius, -1, palette, alpha), buildJumpRamp(radius, 1, palette, alpha));
+
+  const run = radius * JUMP_RAMP_RUN_FACTOR;
+  const peakY = radius * JUMP_PEAK_HEIGHT_FACTOR;
+  const lipBelow = radius * JUMP_RAMP_LIP_BELOW_SURFACE_FACTOR;
+  const width = radius * JUMP_RAMP_WIDTH_FACTOR;
+  const rise = peakY + lipBelow;
+  const angle = Math.atan2(rise, run);
+  const lipThickness = radius * 0.04;
+  const lipWidth = radius * 0.06;
+
+  for (const zSign of [-1, 1] as const) {
+    for (const xSign of [-1, 1] as const) {
+      const lip = new Mesh(
+        new BoxGeometry(lipWidth, lipThickness, run * 0.85),
+        makeMaterial(palette.accent, alpha),
+      );
+      const along = run * 0.42;
+      lip.position.set(
+        xSign * (width * 0.5 - lipWidth),
+        peakY - along * Math.sin(angle) - lipBelow * 0.15,
+        -zSign * along * Math.cos(angle),
+      );
+      lip.rotation.x = zSign * angle;
+      group.add(lip);
+    }
+  }
+
+  const ridge = new Mesh(
+    new BoxGeometry(width * 0.55, radius * 0.05, radius * 0.08),
+    makeMaterial(palette.accent, alpha),
+  );
+  ridge.position.y = peakY + radius * 0.02;
+  group.add(ridge);
+
   // Meshes are built along +Z; align with reef tangent (rails use +X).
   group.rotation.y = Math.PI / 2;
   return group;
@@ -309,17 +385,24 @@ function buildBrainCoralGroup(
   );
   core.position.y = radius * 0.32;
   core.scale.y = 0.8;
-  const bump = new Mesh(
-    new IcosahedronGeometry(radius * 0.3, 0),
-    makeMaterial(palette.accent, alpha),
-  );
-  bump.position.set(radius * 0.25, radius * 0.48, radius * 0.15);
-  const bumpSmall = new Mesh(
-    new IcosahedronGeometry(radius * 0.2, 0),
-    makeMaterial(palette.accent, alpha),
-  );
-  bumpSmall.position.set(-radius * 0.28, radius * 0.42, -radius * 0.18);
-  group.add(core, bump, bumpSmall);
+  group.add(core);
+
+  const lobes: Array<{ x: number; y: number; z: number; s: number; accent: boolean }> = [
+    { x: 0.25, y: 0.48, z: 0.15, s: 0.3, accent: true },
+    { x: -0.28, y: 0.42, z: -0.18, s: 0.2, accent: true },
+    { x: 0.05, y: 0.55, z: -0.22, s: 0.22, accent: false },
+    { x: -0.18, y: 0.5, z: 0.22, s: 0.18, accent: true },
+    { x: 0.32, y: 0.36, z: -0.08, s: 0.16, accent: false },
+    { x: -0.08, y: 0.28, z: 0.3, s: 0.14, accent: true },
+  ];
+  for (const lobe of lobes) {
+    const bump = new Mesh(
+      new IcosahedronGeometry(radius * lobe.s, 0),
+      makeMaterial(lobe.accent ? palette.accent : palette.base, alpha),
+    );
+    bump.position.set(radius * lobe.x, radius * lobe.y, radius * lobe.z);
+    group.add(bump);
+  }
   return group;
 }
 
@@ -329,17 +412,38 @@ function buildWallRideGroup(
   alpha: number,
 ): Group {
   const group = new Group();
+  // Keep crest thickness ≤ WALL_THICKNESS_FACTOR (0.34) used by trickAnimationPose stand-off.
   const wall = new Mesh(
-    new BoxGeometry(radius * 0.24, radius * 1.15, radius * 1.35),
+    new BoxGeometry(radius * 0.2, radius * 1.15, radius * 1.35),
     makeMaterial(palette.base, alpha),
   );
   wall.position.set(0, radius * 0.48, 0);
+  const facePanel = new Mesh(
+    new BoxGeometry(radius * 0.06, radius * 0.95, radius * 1.2),
+    makeMaterial(palette.accent, alpha),
+  );
+  facePanel.position.set(radius * 0.12, radius * 0.5, 0);
+  const footing = new Mesh(
+    new BoxGeometry(radius * 0.32, radius * 0.1, radius * 1.4),
+    makeMaterial(palette.base, alpha),
+  );
+  footing.position.set(0, radius * 0.05, 0);
   const crest = new Mesh(
     new BoxGeometry(radius * 0.34, radius * 0.14, radius * 1.45),
     makeMaterial(palette.accent, alpha),
   );
   crest.position.y = radius * 1.02;
-  group.add(wall, crest);
+
+  for (const z of [-0.5, -0.17, 0.17, 0.5]) {
+    const tooth = new Mesh(
+      new BoxGeometry(radius * 0.08, radius * 0.12, radius * 0.1),
+      makeMaterial(palette.base, alpha),
+    );
+    tooth.position.set(0, radius * 1.12, radius * z);
+    group.add(tooth);
+  }
+
+  group.add(wall, facePanel, footing, crest);
   // Meshes are built along +Z; ride direction matches rails along +X.
   group.rotation.y = Math.PI / 2;
   return group;
@@ -374,17 +478,25 @@ function addApproachChevrons(
   alpha: number,
 ): void {
   const material = makeMaterial(0xfff566, alpha * 0.9);
+  const stemMaterial = makeMaterial(0xe8c830, alpha * 0.85);
   const approachSides = type === 'jump' ? [-1, 1] : [1];
 
   for (const side of approachSides) {
     const chevrons = new Group();
     chevrons.rotation.y = Math.PI / 2;
     for (const offset of [-0.72, -0.52, -0.32]) {
-      const cone = new Mesh(new ConeGeometry(radius * 0.15, radius * 0.25, 3), material);
+      const marker = new Group();
+      const cone = new Mesh(new ConeGeometry(radius * 0.16, radius * 0.22, 3), material);
       cone.rotation.x = Math.PI;
       cone.rotation.z = Math.PI;
-      cone.position.set(0, radius * 0.08, side * (radius * offset + radius * 0.22));
-      chevrons.add(cone);
+      const stem = new Mesh(
+        new BoxGeometry(radius * 0.06, radius * 0.04, radius * 0.12),
+        stemMaterial,
+      );
+      stem.position.z = radius * 0.1;
+      marker.add(cone, stem);
+      marker.position.set(0, radius * 0.08, side * (radius * offset + radius * 0.22));
+      chevrons.add(marker);
     }
     group.add(chevrons);
   }

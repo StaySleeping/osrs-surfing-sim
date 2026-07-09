@@ -26,15 +26,26 @@ function makeJellyfishMesh(): Group {
     flatMaterial(JELLY_BELL_COLOR, 0.7),
   );
   bell.position.y = 0.05;
-  group.add(bell);
+  const dome = new Mesh(
+    new CylinderGeometry(0.08, 0.12, 0.06, 8),
+    flatMaterial(JELLY_BELL_COLOR, 0.7),
+  );
+  dome.position.y = 0.12;
+  group.add(bell, dome);
 
-  const tentacleOffsets = [-0.08, -0.04, 0, 0.04, 0.08];
+  const tentacleOffsets = [
+    { x: -0.08, z: 0 },
+    { x: -0.04, z: 0.04 },
+    { x: 0, z: 0 },
+    { x: 0.04, z: -0.04 },
+    { x: 0.08, z: 0 },
+  ];
   for (const offset of tentacleOffsets) {
     const tentacle = new Mesh(
-      new BoxGeometry(0.03, 0.14, 0.03),
+      new BoxGeometry(0.03, 0.16, 0.03),
       flatMaterial(JELLY_TENTACLE_COLOR, 0.85),
     );
-    tentacle.position.set(offset, -0.08, 0);
+    tentacle.position.set(offset.x, -0.09, offset.z);
     group.add(tentacle);
   }
 
