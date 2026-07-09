@@ -23,7 +23,7 @@ export const MINIMAP_BOTTOM_HEIGHT = 8;
 export const MINIMAP_FRAME_LEFT = SIDEBAR_CONTENT_LEFT + MINIMAP_LEFT_EDGE_WIDTH;
 export const MINIMAP_MAP_SIZE = 146;
 /** Map inset within the frame sprite (hole is shifted right for the compass lobe). */
-export const MINIMAP_MAP_INSET_X = 13;
+export const MINIMAP_MAP_INSET_X = 24;
 export const MINIMAP_MAP_TOP = 8;
 export const MINIMAP_MAP_LEFT = MINIMAP_FRAME_LEFT + MINIMAP_MAP_INSET_X;
 export const MINIMAP_COMPASS_LEFT = MINIMAP_FRAME_LEFT + 2;
