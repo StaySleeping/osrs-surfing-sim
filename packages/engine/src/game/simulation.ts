@@ -787,8 +787,9 @@ export class GameSimulation {
         this.cameraFacingRadians ??
         (headingToDegrees(this.surfboard.currentHeading) * Math.PI) / 180,
     };
-    this.demoSurfers = this.demoSurfers.map((surfer) =>
-      tickDemoSurfer(surfer, this.arena.map, this.trickZones, this.tide, audience),
+    this.demoSurfers = this.demoSurfers.map(
+      (surfer) =>
+        tickDemoSurfer(surfer, this.arena.map, this.trickZones, this.tide, audience).runtime,
     );
 
     this.tickCount += 1;

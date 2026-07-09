@@ -72,13 +72,17 @@ export const DEMO_SURFER_AHEAD_ANGLE_STEP = 0.18;
 export const SHOWOFF_FOLLOW_DISTANCE = 16;
 export const SHOWOFF_MIN_PLAYER_DISTANCE = 7;
 /** Hunt features inside this view cone from the camera (radians half-angle). */
-export const SHOWOFF_VIEW_CONE_RADIANS = 0.7;
+export const SHOWOFF_VIEW_CONE_RADIANS = 0.85;
 /** Only chase features this close to the audience so tricks happen on screen. */
-export const SHOWOFF_TRICK_RANGE = 40;
+export const SHOWOFF_TRICK_RANGE = 48;
+/** Prefer any feature this close to the show-off even if slightly off-camera. */
+export const SHOWOFF_NEAR_TRICK_DISTANCE = 18;
 /** Within this range of the anchor the show-off carves circles instead. */
 export const SHOWOFF_CARVE_RADIUS = 5;
 /** Heading steps per tick while carving a circle (16 steps = full turn). */
 export const SHOWOFF_CARVE_HEADING_STEP = 2;
+/** Prime show-off tricks from farther out than reef loopers. */
+export const SHOWOFF_ZONE_PRIME_DISTANCE = 16;
 
 /** Explorer wander tuning. */
 export const EXPLORER_TARGET_REACHED_DISTANCE = 4;
@@ -129,6 +133,8 @@ export interface DemoSurferAiState {
   lastPosition: WorldPos | null;
   stuckTicks: number;
   rngState: number;
+  /** Zone ids this surfer already completed — skip until the feature respawns. */
+  completedZoneIds: string[];
 }
 
 export function createDemoSurferAiState(seed: number): DemoSurferAiState {
@@ -139,6 +145,7 @@ export function createDemoSurferAiState(seed: number): DemoSurferAiState {
     lastPosition: null,
     stuckTicks: 0,
     rngState: seed >>> 0 || 1,
+    completedZoneIds: [],
   };
 }
 
@@ -403,6 +410,7 @@ function selectTrickZone(
   trickZones: TrickZone[],
   tide: TideState | null,
   sector: { centerRadians: number; halfWidthRadians: number } | null = null,
+  completedZoneIds: ReadonlySet<string> = new Set(),
 ): TrickZone | null {
   if (!tide) {
     return null;
@@ -416,7 +424,7 @@ function selectTrickZone(
   let bestDist = Infinity;
 
   for (const zone of trickZones) {
-    if (zone.tricked) {
+    if (zone.tricked || completedZoneIds.has(zone.id)) {
       continue;
     }
     if (isTrickZoneSubmerged(zone, tide)) {
@@ -474,17 +482,16 @@ function shouldPrimeTrick(
   zone: TrickZone,
   trickPrepare: TrickPrepareState | null,
   inFrontHalf: boolean,
+  primeDistance = DEMO_SURFER_ZONE_PRIME_DISTANCE,
 ): TrickPrepareState['slot'] | undefined {
   if (trickPrepare) {
     return undefined;
   }
 
   const dist = Math.hypot(position.x - zone.center.x, position.y - zone.center.y);
-  const primeDistance = inFrontHalf
-    ? DEMO_SURFER_ZONE_PRIME_DISTANCE + 4
-    : DEMO_SURFER_ZONE_PRIME_DISTANCE;
+  const effectivePrime = inFrontHalf ? primeDistance + 4 : primeDistance;
   const minDist = trickZoneHitboxReach(zone) * (inFrontHalf ? 0.35 : 0.45);
-  if (dist < primeDistance && dist > minDist) {
+  if (dist < effectivePrime && dist > minDist) {
     return zone.prepareSlot;
   }
 
@@ -606,10 +613,11 @@ function computeReefRiderAi(
     behavior.kind === 'sector'
       ? { centerRadians: behavior.centerRadians, halfWidthRadians: behavior.halfWidthRadians }
       : null;
+  const completed = new Set(aiState.completedZoneIds);
   // Trick targeting assumes a clockwise approach; skip while patrolling back.
   const targetZone =
     behavior.doesTricks && direction === 1
-      ? selectTrickZone(position, trickZones, tide, sector)
+      ? selectTrickZone(position, trickZones, tide, sector, completed)
       : null;
   let steerX = position.x;
   let steerY = position.y;
@@ -665,34 +673,40 @@ function showoffAnchor(map: WorldMap, audience: ShowoffAudience, followDistance:
   return idealReefPoint(polarFromIsland(audience.x, audience.y).angle);
 }
 
-/** Nearest untricked, exposed feature inside the camera's view cone. */
+/** Nearest untricked, exposed feature — prefer nearby ones, then on-camera. */
 function selectShowoffZone(
   position: WorldPos,
   audience: ShowoffAudience,
   trickZones: TrickZone[],
   tide: TideState | null,
+  completedZoneIds: ReadonlySet<string>,
 ): TrickZone | null {
   let best: TrickZone | null = null;
-  let bestDist = Infinity;
+  let bestScore = Infinity;
 
   for (const zone of trickZones) {
-    if (zone.tricked) {
+    if (zone.tricked || completedZoneIds.has(zone.id)) {
       continue;
     }
     if (tide && isTrickZoneSubmerged(zone, tide)) {
       continue;
     }
-    const toZone = Math.atan2(zone.center.y - audience.y, zone.center.x - audience.x);
-    if (Math.abs(signedAngleDelta(audience.facingRadians, toZone)) > SHOWOFF_VIEW_CONE_RADIANS) {
-      continue;
-    }
-    const audienceDist = Math.hypot(zone.center.x - audience.x, zone.center.y - audience.y);
-    if (audienceDist > SHOWOFF_TRICK_RANGE) {
-      continue;
-    }
     const dist = Math.hypot(zone.center.x - position.x, zone.center.y - position.y);
-    if (dist < bestDist) {
-      bestDist = dist;
+    const audienceDist = Math.hypot(zone.center.x - audience.x, zone.center.y - audience.y);
+    if (audienceDist > SHOWOFF_TRICK_RANGE && dist > SHOWOFF_NEAR_TRICK_DISTANCE) {
+      continue;
+    }
+    const toZone = Math.atan2(zone.center.y - audience.y, zone.center.x - audience.x);
+    const inView =
+      Math.abs(signedAngleDelta(audience.facingRadians, toZone)) <= SHOWOFF_VIEW_CONE_RADIANS;
+    // Nearby features win even slightly off-camera; otherwise stay in view.
+    if (!inView && dist > SHOWOFF_NEAR_TRICK_DISTANCE) {
+      continue;
+    }
+    // Lower score = better. Nearby tricks get a strong bias.
+    const score = dist - (dist <= SHOWOFF_NEAR_TRICK_DISTANCE ? 12 : 0) - (inView ? 4 : 0);
+    if (score < bestScore) {
+      bestScore = score;
       best = zone;
     }
   }
@@ -763,7 +777,13 @@ function computeShowoffAi(
     return { standUp: true, setIntendedHeading: outward };
   }
 
-  const targetZone = selectShowoffZone(position, audience, trickZones, tide);
+  const targetZone = selectShowoffZone(
+    position,
+    audience,
+    trickZones,
+    tide,
+    new Set(aiState.completedZoneIds),
+  );
   if (targetZone) {
     const steer = steerTowardZone(position, targetZone);
     const input: DemoSurferAiInput = {
@@ -773,7 +793,13 @@ function computeShowoffAi(
         y: steer.steerY,
       }),
     };
-    const primeSlot = shouldPrimeTrick(position, targetZone, trickPrepare, true);
+    const primeSlot = shouldPrimeTrick(
+      position,
+      targetZone,
+      trickPrepare,
+      true,
+      SHOWOFF_ZONE_PRIME_DISTANCE,
+    );
     if (primeSlot !== undefined) {
       input.prepareSlot = primeSlot;
     }

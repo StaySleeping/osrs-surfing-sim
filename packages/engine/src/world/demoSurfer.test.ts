@@ -40,7 +40,7 @@ describe('demoSurfer', () => {
     });
     const beforeHeading = runtime.surfboard.currentHeading;
 
-    runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide);
+    runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide).runtime;
 
     expect(runtime.tideSpinTicksRemaining).toBeGreaterThan(0);
     expect(runtime.surfboard.speedState).not.toBe('seated');
@@ -55,7 +55,7 @@ describe('demoSurfer', () => {
     let runtime = createDemoSurfer(arena.demoSurfers[0]);
 
     for (let i = 0; i < 600; i += 1) {
-      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide);
+      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide).runtime;
       const { x, y } = runtime.surfboard.position;
       const tile = getTile(arena.map, Math.floor(x), Math.floor(y));
       expect(tile).not.toBeNull();
@@ -93,7 +93,7 @@ describe('demoSurfer', () => {
     let runtime = createDemoSurfer(kai);
 
     for (let i = 0; i < 1200; i += 1) {
-      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide);
+      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide).runtime;
       const { x, y } = runtime.surfboard.position;
       const angle = Math.atan2(y - CORAL_PARK_ISLAND_CY, x - CORAL_PARK_ISLAND_CX);
       let delta = (angle - behavior.centerRadians) % (Math.PI * 2);
@@ -120,7 +120,7 @@ describe('demoSurfer', () => {
 
     for (let i = 0; i < 2400; i += 1) {
       movingTide = tickTide(movingTide);
-      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, movingTide);
+      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, movingTide).runtime;
       const { x, y } = runtime.surfboard.position;
       const tile = getTile(arena.map, Math.floor(x), Math.floor(y));
       expect(tile).not.toBeNull();
@@ -133,6 +133,46 @@ describe('demoSurfer', () => {
 
     expect(visitedSweep).toBe(true);
     expect(maxTravel).toBeGreaterThan(80);
+  });
+
+  it('does not re-enter the same trick zone after completing it', () => {
+    const arena = createCoralParkSlice();
+    const tide = createTideState(arena.tide!);
+    const zone = arena.trickZones.find((entry) => entry.type === 'rail') ?? arena.trickZones[0];
+    let runtime = createDemoSurfer({
+      ...arena.demoSurfers.find((surfer) => surfer.id === 'koa')!,
+      startX: zone.center.x - zone.radius * 0.9,
+      startY: zone.center.y,
+      startHeading: 0,
+    });
+
+    let completedZoneId: string | null = null;
+    for (let i = 0; i < 80; i += 1) {
+      const before = runtime.trickAnimation;
+      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide, {
+        x: zone.center.x - 20,
+        y: zone.center.y,
+        facingRadians: 0,
+      }).runtime;
+      if (before && !runtime.trickAnimation) {
+        completedZoneId = before.zoneId;
+        break;
+      }
+    }
+
+    expect(completedZoneId).not.toBeNull();
+    expect(runtime.aiState.completedZoneIds).toContain(completedZoneId);
+
+    for (let i = 0; i < 80; i += 1) {
+      runtime = tickDemoSurfer(runtime, arena.map, arena.trickZones, tide, {
+        x: zone.center.x - 20,
+        y: zone.center.y,
+        facingRadians: 0,
+      }).runtime;
+      if (runtime.trickAnimation?.zoneId === completedZoneId) {
+        throw new Error('re-entered completed zone');
+      }
+    }
   });
 
   // Statistical behaviour over random layouts; retry rules out unlucky arenas.

@@ -51,6 +51,8 @@ export interface DemoSurferConfig {
   behavior?: DemoSurferBehavior;
   /** Scales board speed and turn rate relative to the shared stats. */
   speedMultiplier?: number;
+  /** Extra turn-rate scale on top of speedMultiplier (tighter carve). */
+  turnRateMultiplier?: number;
 }
 
 export interface DemoSurferSnapshot {
@@ -62,6 +64,10 @@ export interface DemoSurferSnapshot {
   trickSpeedBoostTicksRemaining: number;
   /** 0–1 progress through an active tide spin, or null when not spinning. */
   tideSpinProgress: number | null;
+}
+
+export interface DemoSurferTickResult {
+  runtime: DemoSurferRuntime;
 }
 
 interface DemoSurferRuntime {
@@ -86,20 +92,43 @@ function seedFromId(id: string): number {
   return hash >>> 0;
 }
 
+function rememberCompletedZone(aiState: DemoSurferAiState, zoneId: string): DemoSurferAiState {
+  if (aiState.completedZoneIds.includes(zoneId)) {
+    return aiState;
+  }
+  return { ...aiState, completedZoneIds: [...aiState.completedZoneIds, zoneId] };
+}
+
+/** Drop ids for features that no longer exist (tide purge / respawn). */
+function pruneCompletedZones(
+  aiState: DemoSurferAiState,
+  trickZones: TrickZone[],
+): DemoSurferAiState {
+  if (aiState.completedZoneIds.length === 0) {
+    return aiState;
+  }
+  const live = new Set(trickZones.map((zone) => zone.id));
+  const next = aiState.completedZoneIds.filter((id) => live.has(id));
+  return next.length === aiState.completedZoneIds.length
+    ? aiState
+    : { ...aiState, completedZoneIds: next };
+}
+
 export function createDemoSurfer(
   config: DemoSurferConfig,
   stats?: SurfboardStats,
 ): DemoSurferRuntime {
   const board = createSurfboard(config.startX, config.startY, config.startHeading);
   const baseStats = stats ?? { ...DEFAULT_SURFBOARD_STATS };
-  const multiplier = config.speedMultiplier ?? 1;
+  const speedMultiplier = config.speedMultiplier ?? 1;
+  const turnMultiplier = (config.turnRateMultiplier ?? 1) * speedMultiplier;
   const surferStats =
-    multiplier === 1
+    speedMultiplier === 1 && (config.turnRateMultiplier ?? 1) === 1
       ? baseStats
       : {
-          turnRateDegPerTick: baseStats.turnRateDegPerTick * multiplier,
-          speedPaddle: baseStats.speedPaddle * multiplier,
-          speedRide: baseStats.speedRide * multiplier,
+          turnRateDegPerTick: baseStats.turnRateDegPerTick * turnMultiplier,
+          speedPaddle: baseStats.speedPaddle * speedMultiplier,
+          speedRide: baseStats.speedRide * speedMultiplier,
         };
   return {
     config,
@@ -154,7 +183,7 @@ function resolveDemoTrickEntry(
     trickPrepare: null,
     trickAnimation,
     trickSpeedBoost: refreshTrickSpeedBoost(),
-    activeTrickZoneId: null,
+    activeTrickZoneId: zone.id,
     tideSpinTicksRemaining: 0,
     surfboard: {
       ...runtime.surfboard,
@@ -192,25 +221,34 @@ export function tickDemoSurfer(
   trickZones: TrickZone[],
   tide: TideState | null,
   audience: ShowoffAudience | null = null,
-): DemoSurferRuntime {
+): DemoSurferTickResult {
+  runtime = { ...runtime, aiState: pruneCompletedZones(runtime.aiState, trickZones) };
+
   if (runtime.trickAnimation) {
     const result = tickTrickAnimation(runtime.trickAnimation);
+    const completedId = result.state === null ? runtime.trickAnimation.zoneId : null;
     return {
-      ...runtime,
-      trickAnimation: result.state,
-      surfboard: {
-        ...runtime.surfboard,
-        position: result.position,
-        currentHeading: result.heading,
-        intendedHeading: result.heading,
-        isRotating: false,
+      runtime: {
+        ...runtime,
+        aiState: completedId
+          ? rememberCompletedZone(runtime.aiState, completedId)
+          : runtime.aiState,
+        trickAnimation: result.state,
+        activeTrickZoneId: result.state === null ? null : runtime.activeTrickZoneId,
+        surfboard: {
+          ...runtime.surfboard,
+          position: result.position,
+          currentHeading: result.heading,
+          intendedHeading: result.heading,
+          isRotating: false,
+        },
+        trickPrepare: advanceTrickPrepare(runtime.trickPrepare),
       },
-      trickPrepare: advanceTrickPrepare(runtime.trickPrepare),
     };
   }
 
   if (runtime.tideSpinTicksRemaining > 0) {
-    return tickTideSpin(runtime, map);
+    return { runtime: tickTideSpin(runtime, map) };
   }
 
   const ringDepth =
@@ -223,17 +261,24 @@ export function tickDemoSurfer(
     shouldStartTideSpin(runtime.surfboard.position, runtime.surfboard, tide, ringDepth)
   ) {
     if (runtime.behavior.kind !== 'explorer') {
-      return tickTideSpin({ ...runtime, tideSpinTicksRemaining: DEMO_SURFER_TIDE_SPIN_TICKS }, map);
+      return {
+        runtime: tickTideSpin(
+          { ...runtime, tideSpinTicksRemaining: DEMO_SURFER_TIDE_SPIN_TICKS },
+          map,
+        ),
+      };
     }
     // Explorers sometimes lie down and let the swell roll over them instead.
     if (runtime.aiState.loungeTicksRemaining <= 0) {
       const roll = rollExplorerSwellLounge(runtime.aiState);
       runtime = { ...runtime, aiState: roll.aiState };
       if (!roll.lounge) {
-        return tickTideSpin(
-          { ...runtime, tideSpinTicksRemaining: DEMO_SURFER_TIDE_SPIN_TICKS },
-          map,
-        );
+        return {
+          runtime: tickTideSpin(
+            { ...runtime, tideSpinTicksRemaining: DEMO_SURFER_TIDE_SPIN_TICKS },
+            map,
+          ),
+        };
       }
     }
   }
@@ -284,14 +329,17 @@ export function tickDemoSurfer(
 
   if (next.surfboard.speedState !== 'seated') {
     const zone = findTrickZoneAt(trickZones, next.surfboard.position, tide, rideStartPosition);
-    if (zone && next.activeTrickZoneId !== zone.id) {
-      return resolveDemoTrickEntry({ ...next, activeTrickZoneId: zone.id }, zone, map);
+    const alreadyDone = zone !== null && next.aiState.completedZoneIds.includes(zone.id);
+    if (zone && !alreadyDone && next.activeTrickZoneId !== zone.id) {
+      return {
+        runtime: resolveDemoTrickEntry({ ...next, activeTrickZoneId: zone.id }, zone, map),
+      };
     }
     if (!zone) {
-      return { ...next, activeTrickZoneId: null };
+      return { runtime: { ...next, activeTrickZoneId: null } };
     }
-    return next;
+    return { runtime: next };
   }
 
-  return { ...next, activeTrickZoneId: null };
+  return { runtime: { ...next, activeTrickZoneId: null } };
 }
