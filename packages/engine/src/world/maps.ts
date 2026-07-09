@@ -20,11 +20,7 @@ import {
   SHOWOFF_FOLLOW_DISTANCE,
   type DemoSurferBehavior,
 } from '../ai/demoSurferAi.js';
-import {
-  HULL_SPEED_CAMPHOR_TILES_PER_TICK,
-  HULL_SPEED_ROSEWOOD_TILES_PER_TICK,
-} from '../constants/movement.js';
-import { TRICK_SPEED_BOOST_MULTIPLIER } from '../constants/tricks.js';
+import { HULL_SPEED_CAMPHOR_TILES_PER_TICK } from '../constants/movement.js';
 import type { DemoSurferConfig } from './demoSurfer.js';
 import type { TideConfig, TrickZone } from './features.js';
 import type { NpcDefinition } from './npc.js';
@@ -115,12 +111,11 @@ const KAI_RING_DEPTH = 0.45;
 const HINA_RING_DEPTH = 0.82;
 
 /**
- * Koa shows off in front of the camera. Ride speed matches rosewood + trick
- * boost (3 × 1.5 tiles/tick vs camphor 2.5); turn is tighter than that scale.
+ * Koa shows off in front of the camera. Cruise is slightly above rosewood
+ * (3.2 vs 3.0 tiles/tick); post-trick boost still applies on top.
  */
-const KOA_SPEED_MULTIPLIER =
-  (HULL_SPEED_ROSEWOOD_TILES_PER_TICK * TRICK_SPEED_BOOST_MULTIPLIER) /
-  HULL_SPEED_CAMPHOR_TILES_PER_TICK;
+const KOA_CRUISE_TILES_PER_TICK = 3.2;
+const KOA_SPEED_MULTIPLIER = KOA_CRUISE_TILES_PER_TICK / HULL_SPEED_CAMPHOR_TILES_PER_TICK;
 /** Extra turn tightness on top of the speed scale (smaller radius). */
 const KOA_TURN_RATE_MULTIPLIER = 1.35;
 
