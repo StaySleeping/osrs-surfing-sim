@@ -149,18 +149,10 @@ function rideAlongFromCenter(animation: DisplayTrickAnimation, progress: number)
   }
   const rideX = rideDx / rideLen;
   const rideY = rideDy / rideLen;
-  const startAlong =
-    (animation.start.x - animation.zoneCenter.x) * rideX +
-    (animation.start.y - animation.zoneCenter.y) * rideY;
-  const endAlong =
-    (animation.end.x - animation.zoneCenter.x) * rideX +
-    (animation.end.y - animation.zoneCenter.y) * rideY;
-
-  if (progress <= TRICK_ANIMATION_ALIGN_PROGRESS) {
-    return startAlong;
-  }
-  const rideT = (progress - TRICK_ANIMATION_ALIGN_PROGRESS) / (1 - TRICK_ANIMATION_ALIGN_PROGRESS);
-  return startAlong + (endAlong - startAlong) * rideT;
+  const pathPos = trickAnimationPositionAtProgress(animation, progress);
+  return (
+    (pathPos.x - animation.zoneCenter.x) * rideX + (pathPos.y - animation.zoneCenter.y) * rideY
+  );
 }
 
 /** Convert a feature-mesh world Y into board lift above the ride surface. */
@@ -313,13 +305,14 @@ function jumpRampSurfaceY(radius: number, along: number): number {
   const lipBelow = radius * JUMP_RAMP_LIP_BELOW_SURFACE_FACTOR;
   const rise = peak + lipBelow;
 
+  let surface = 0;
   if (along >= -run && along <= 0) {
-    return -lipBelow + ((along + run) / run) * rise;
+    surface = -lipBelow + ((along + run) / run) * rise;
+  } else if (along > 0 && along <= run) {
+    surface = peak - (along / run) * rise;
   }
-  if (along > 0 && along <= run) {
-    return peak - (along / run) * rise;
-  }
-  return 0;
+  // Outer lip sits below the ride surface — treat submerged face as water height.
+  return Math.max(0, surface);
 }
 
 function jumpTakeOffProgress(animation: DisplayTrickAnimation): number {
@@ -336,28 +329,29 @@ function jumpTakeOffProgress(animation: DisplayTrickAnimation): number {
   return TRICK_ANIMATION_ALIGN_PROGRESS + t * (1 - TRICK_ANIMATION_ALIGN_PROGRESS);
 }
 
+function jumpBoardLift(radius: number, along: number, pitch: number): number {
+  const footprintY = maxMeshYAlongBoard((a) => jumpRampSurfaceY(radius, a), along);
+  return liftFromMeshY(footprintY) + Math.abs(Math.sin(pitch)) * BOARD_HALF_LENGTH * 0.25;
+}
+
 function jumpPose(animation: DisplayTrickAnimation, progress: number): TrickPoseOffsets {
   const radius = animation.zoneRadius;
   const takeOff = jumpTakeOffProgress(animation);
   const along = rideAlongFromCenter(animation, progress);
   const climbPitch = JUMP_CLIMB_PITCH;
+  const waterlineAlong =
+    (radius * JUMP_PEAK_FACTOR) / (JUMP_PEAK_FACTOR + JUMP_RAMP_LIP_BELOW_SURFACE_FACTOR);
 
   let lift: number;
   let pitch: number;
   let crouch = 0;
 
-  if (progress < TRICK_ANIMATION_ALIGN_PROGRESS) {
-    const startAlong = rideAlongFromCenter(animation, TRICK_ANIMATION_ALIGN_PROGRESS);
-    const startLift =
-      liftFromMeshY(maxMeshYAlongBoard((a) => jumpRampSurfaceY(radius, a), startAlong)) +
-      Math.abs(Math.sin(climbPitch)) * BOARD_HALF_LENGTH * 0.25;
-    const t = progress / TRICK_ANIMATION_ALIGN_PROGRESS;
-    lift = easeInOutSine(t) * startLift;
-    pitch = climbPitch * easeInOutSine(t);
-  } else if (progress < takeOff) {
-    const footprintY = maxMeshYAlongBoard((a) => jumpRampSurfaceY(radius, a), along);
-    lift = liftFromMeshY(footprintY) + Math.abs(Math.sin(climbPitch)) * BOARD_HALF_LENGTH * 0.25;
-    pitch = climbPitch;
+  if (progress < takeOff) {
+    // Start seaward of the waterline on flat water (pitch 0), then match the
+    // ramp face once the nose reaches the visible base.
+    const ontoRamp = clamp01((along + waterlineAlong + BOARD_HALF_LENGTH) / BOARD_HALF_LENGTH);
+    pitch = climbPitch * easeInOutSine(ontoRamp);
+    lift = jumpBoardLift(radius, along, pitch);
   } else {
     const t = (progress - takeOff) / (1 - takeOff);
     const peakLift = liftFromMeshY(radius * JUMP_PEAK_FACTOR);

@@ -7,6 +7,7 @@ import {
 import type { WorldPos } from './coords.js';
 import { isWorldPointSailingTarget, type WorldMap } from './collision.js';
 import type { TrickFeatureType, TrickZone } from './features.js';
+import { jumpRampWaterlineAlongFactor, SURFBOARD_HALF_LENGTH_TILES } from './trickHitbox.js';
 
 export const TRICK_ANIMATION_TICKS = 2;
 
@@ -16,7 +17,7 @@ export const TRICK_ANIMATION_ALIGN_PROGRESS = 0.28;
 /** Travel distance along the feature ride line as a multiple of zone radius. */
 export const TRICK_ANIMATION_TRAVEL_FACTOR: Record<TrickFeatureType, number> = {
   rail: 1.85,
-  /** Long enough that the locked exit clears the far ramp lip (run = 1× radius). */
+  /** Unused for path span — jump uses the waterline extent instead. */
   jump: 2.25,
   tunnel: 1.75,
   wall_ride: 1.55,
@@ -201,8 +202,12 @@ export function resolveLockedTrickPath(
   entryPosition: WorldPos,
   rideVector: { x: number; y: number },
 ): { start: WorldPos; end: WorldPos } {
-  const span = zone.radius * TRICK_ANIMATION_TRAVEL_FACTOR[zone.type];
-  const halfSpan = span * LOCKED_PATH_HALF_SPAN_FACTOR;
+  // Jump starts/ends with the board centre just seaward of the waterline so the
+  // nose meets the visible ramp base instead of already overlapping the face.
+  const halfSpan =
+    zone.type === 'jump'
+      ? zone.radius * jumpRampWaterlineAlongFactor() + SURFBOARD_HALF_LENGTH_TILES
+      : zone.radius * TRICK_ANIMATION_TRAVEL_FACTOR[zone.type] * LOCKED_PATH_HALF_SPAN_FACTOR;
   const entryAlong = -halfSpan;
   const exitAlong = halfSpan;
 
@@ -243,6 +248,11 @@ export function createTrickAnimationState(
   const rideHeading = headingFromRideVector(rideVector);
   const { start, end } = resolveLockedTrickPath(map, zone, entryPosition, rideVector);
 
+  // Jump lip is underwater past the waterline — starting the align carve from
+  // open water would drive the board through that submerged bulk. Begin on the
+  // visible ramp base instead.
+  const entry = zone.type === 'jump' ? { ...start } : { ...entryPosition };
+
   return {
     zoneId: zone.id,
     type: zone.type,
@@ -250,7 +260,7 @@ export function createTrickAnimationState(
     zoneCenter: { ...zone.center },
     rotationRadians: zone.rotationRadians,
     rideSide: featureRideSide(zone, entryPosition, rideVector),
-    entry: { ...entryPosition },
+    entry,
     entryHeading: startHeading,
     start,
     end,

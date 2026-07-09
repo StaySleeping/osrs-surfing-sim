@@ -2,18 +2,29 @@ import type { WorldPos } from './coords.js';
 import type { TrickFeatureType, TrickZone } from './features.js';
 
 /** Mirrors client jump ramp mesh factors (trickFeatureMeshes.ts). */
-const JUMP_RAMP_RUN = 1;
-const JUMP_RAMP_PEAK_HEIGHT = 0.55;
-const JUMP_RAMP_LIP_BELOW_SURFACE = 0.12;
+export const JUMP_RAMP_RUN = 1;
+export const JUMP_RAMP_PEAK_HEIGHT = 0.55;
+export const JUMP_RAMP_LIP_BELOW_SURFACE = 0.12;
 const JUMP_RAMP_WIDTH = 2.2;
 /** Ride-axis slack beyond where the ramp top crosses the ride surface (y=0). */
 const JUMP_HITBOX_PAST_WATER_ALONG = 0.08;
 const JUMP_HITBOX_ABOVE_SURFACE_HEIGHT = 0.08;
 
+/**
+ * Distance along the ride axis from centre to where the ramp top meets the
+ * ride surface (fraction of zone radius). Past this the lip is underwater.
+ */
+export function jumpRampWaterlineAlongFactor(): number {
+  return (
+    (JUMP_RAMP_RUN * JUMP_RAMP_PEAK_HEIGHT) / (JUMP_RAMP_PEAK_HEIGHT + JUMP_RAMP_LIP_BELOW_SURFACE)
+  );
+}
+
+/** Surfboard half-length in world tiles (matches client surfboardDeckGeometry). */
+export const SURFBOARD_HALF_LENGTH_TILES = 0.68;
+
 function jumpHalfAlongRideFactor(): number {
-  const waterCrossAlong =
-    (JUMP_RAMP_RUN * JUMP_RAMP_PEAK_HEIGHT) / (JUMP_RAMP_PEAK_HEIGHT + JUMP_RAMP_LIP_BELOW_SURFACE);
-  return waterCrossAlong + JUMP_HITBOX_PAST_WATER_ALONG;
+  return jumpRampWaterlineAlongFactor() + JUMP_HITBOX_PAST_WATER_ALONG;
 }
 
 /** Half-torus tunnel mesh (shared with client trickFeatureMeshes.ts). */

@@ -117,6 +117,20 @@ describe('trick animation', () => {
     expect(fromEast.end.x).toBeLessThan(fromEast.start.x);
   });
 
+  it('starts the jump path at the ramp waterline, not past the submerged lip', () => {
+    const jumpZone: TrickZone = { ...zone, type: 'jump', prepareSlot: 2, rotationRadians: 0 };
+    // Enter well west of the feature so the locked start uses the waterline extent.
+    const anim = createTrickAnimationState(arena.map, jumpZone, { x: 24, y: 11 }, 0);
+    const startAlong = anim.start.x - jumpZone.center.x;
+    // Waterline ≈ 3.284; board half-length 0.68 so the nose sits at the waterline.
+    expect(startAlong).toBeCloseTo(-(3.284 + 0.68), 2);
+    expect(anim.end.x - jumpZone.center.x).toBeCloseTo(3.284 + 0.68, 2);
+    // Align entry snaps to the path start so the board never carves through the
+    // submerged outer lip.
+    expect(anim.entry.x).toBeCloseTo(anim.start.x);
+    expect(anim.entry.y).toBeCloseTo(anim.start.y);
+  });
+
   it('follows rider heading when picking ride direction past feature centre', () => {
     const wallZone: TrickZone = {
       ...zone,
