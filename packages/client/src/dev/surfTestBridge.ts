@@ -1,5 +1,6 @@
 import type {
   GameSimulation,
+  HeadingIndex,
   SimulationSnapshot,
   SpeedState,
   TrickPrepareSlot,
@@ -11,6 +12,9 @@ export interface SurfTestControls {
   renderFrame: () => void;
   getDisplayPosition?: () => { x: number; y: number };
   getTickBlend?: () => number;
+  setTickBlend?: (blend: number) => void;
+  setOrbit?: (yaw: number, pitch: number, distance?: number) => void;
+  snapFocus?: (tileX: number, tileY: number) => void;
   onSimulationTick?: (before: SimulationSnapshot, after: SimulationSnapshot) => void;
   afterTick?: () => void;
   resetTickBlendTimer?: () => void;
@@ -21,6 +25,11 @@ export interface SurfTestApi {
   setSpeedState: (state: SpeedState) => void;
   prepareTrick: (slot: TrickPrepareSlot) => void;
   clearTrickPrepare: () => void;
+  forceStartTrickAnimation: (
+    zoneId: string,
+    entry?: { x: number; y: number },
+    heading?: HeadingIndex,
+  ) => boolean;
   advanceTicks: (count?: number) => void;
   getSnapshot: () => SimulationSnapshot;
   consumeDialogue: () => string[];
@@ -32,6 +41,12 @@ export interface SurfTestApi {
   renderFrame: () => void;
   getDisplayPosition: () => { x: number; y: number };
   getTickBlend: () => number;
+  /** Scrub display interpolation within the current tick (0–1). Dev/test only. */
+  setTickBlend: (blend: number) => void;
+  /** Set orbit camera yaw/pitch/distance. Dev/test only. */
+  setOrbit: (yaw: number, pitch: number, distance?: number) => void;
+  /** Snap camera focus to a tile without glide. Dev/test only. */
+  snapFocus: (tileX: number, tileY: number) => void;
 }
 
 declare global {
@@ -53,6 +68,18 @@ export function installSurfTestBridge(
     setSpeedState: (state) => simulation.setSpeedState(state),
     prepareTrick: (slot) => simulation.prepareTrick(slot),
     clearTrickPrepare: () => simulation.clearTrickPrepare(),
+    forceStartTrickAnimation: (zoneId, entry, heading) => {
+      const before = simulation.getSnapshot();
+      const ok = simulation.forceStartTrickAnimation(zoneId, entry, heading);
+      if (ok) {
+        const after = simulation.getSnapshot();
+        controls.onSimulationTick?.(before, after);
+        controls.resetTickBlendTimer?.();
+        controls.snapFocus?.(after.surfboard.position.x, after.surfboard.position.y);
+        controls.renderFrame();
+      }
+      return ok;
+    },
     advanceTicks: (count = 1) => {
       for (let i = 0; i < count; i += 1) {
         const before = simulation.getSnapshot();
@@ -74,5 +101,17 @@ export function installSurfTestBridge(
     getDisplayPosition: () =>
       controls.getDisplayPosition?.() ?? simulation.getSnapshot().surfboard.position,
     getTickBlend: () => controls.getTickBlend?.() ?? 0,
+    setTickBlend: (blend) => {
+      controls.setTickBlend?.(blend);
+      controls.renderFrame();
+    },
+    setOrbit: (yaw, pitch, distance) => {
+      controls.setOrbit?.(yaw, pitch, distance);
+      controls.renderFrame();
+    },
+    snapFocus: (tileX, tileY) => {
+      controls.snapFocus?.(tileX, tileY);
+      controls.renderFrame();
+    },
   };
 }

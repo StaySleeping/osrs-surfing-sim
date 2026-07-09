@@ -16,7 +16,8 @@ export const TRICK_ANIMATION_ALIGN_PROGRESS = 0.28;
 /** Travel distance along the feature ride line as a multiple of zone radius. */
 export const TRICK_ANIMATION_TRAVEL_FACTOR: Record<TrickFeatureType, number> = {
   rail: 1.85,
-  jump: 1.65,
+  /** Long enough that the locked exit clears the far ramp lip (run = 1× radius). */
+  jump: 2.25,
   tunnel: 1.75,
   wall_ride: 1.55,
   brain_coral: 1.2,

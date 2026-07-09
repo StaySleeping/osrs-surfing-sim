@@ -217,6 +217,16 @@ export class ThreeRenderer implements IRenderer {
     this.orbitCamera?.snapNorth();
   }
 
+  /** Dev/test: set orbit camera yaw/pitch/distance. */
+  setOrbit(yaw: number, pitch: number, distance?: number): void {
+    this.orbitCamera?.setOrbit(yaw, pitch, distance);
+  }
+
+  /** Dev/test: snap camera focus to a tile without glide. */
+  snapFocus(tileX: number, tileY: number): void {
+    this.orbitCamera?.snapFocus(tileX, tileY);
+  }
+
   setTrueTileVisible(visible: boolean): void {
     this.overlays?.setTrueTileVisible(visible);
   }

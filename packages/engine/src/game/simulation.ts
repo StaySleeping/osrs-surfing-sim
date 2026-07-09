@@ -10,7 +10,7 @@ import { surfboardStatsForUnlocks } from '../progression/surfboardUnlocks.js';
 import type { ProgressionState, UnlockId } from '../progression/types.js';
 import { type OnFootWalkState, planWalkPath, tickOnFootPath } from '../movement/onFoot.js';
 import { headingFromClick } from '../movement/surfboard.js';
-import { headingToDegrees, headingToUnitVector } from '../movement/heading.js';
+import { headingToDegrees, headingToUnitVector, type HeadingIndex } from '../movement/heading.js';
 import {
   createSurfboard,
   tickSurfboard,
@@ -545,6 +545,46 @@ export class GameSimulation {
 
   clearTrickPrepare(): void {
     this.trickPrepare = null;
+  }
+
+  /**
+   * Dev/test helper: start a trick animation on a zone without prepare timing.
+   * Places the board at the given entry (or just west of the zone) and begins the ride.
+   */
+  forceStartTrickAnimation(
+    zoneId: string,
+    entry?: { x: number; y: number },
+    heading: HeadingIndex = 0,
+  ): boolean {
+    const zone = this.trickZones.find((candidate) => candidate.id === zoneId);
+    if (!zone) {
+      return false;
+    }
+    this.trickAnimation = null;
+    if (!this.boardMounted) {
+      this.tryMountBoard();
+    }
+    const entryPos = entry ?? {
+      x: zone.center.x - zone.radius * 0.9,
+      y: zone.center.y,
+    };
+    this.surfboard = {
+      ...this.surfboard,
+      position: { ...entryPos },
+      currentHeading: heading,
+      intendedHeading: heading,
+      speedState: 'riding',
+      isRotating: false,
+    };
+    this.trickPrepare = null;
+    this.trickAnimation = createTrickAnimationState(this.arena.map, zone, entryPos, heading);
+    this.surfboard = {
+      ...this.surfboard,
+      intendedHeading: this.trickAnimation.endHeading,
+      isRotating: false,
+    };
+    this.activeTrickZoneId = null;
+    return true;
   }
 
   private resolveTrickZoneEntry(zone: TrickZone): void {

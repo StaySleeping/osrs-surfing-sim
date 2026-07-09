@@ -238,6 +238,9 @@ export class OsrsClient {
       renderFrame: () => client.renderFrame(),
       getDisplayPosition: () => client.getDisplayPosition(),
       getTickBlend: () => client.getTickBlend(),
+      setTickBlend: (blend) => client.setTickBlend(blend),
+      setOrbit: (yaw, pitch, distance) => client.renderer.setOrbit(yaw, pitch, distance),
+      snapFocus: (tileX, tileY) => client.renderer.snapFocus(tileX, tileY),
       onSimulationTick: (before, after) => client.motion.onSimulationTick(before, after),
       afterTick: () => {
         const snapshot = simulation.getSnapshot();
@@ -397,6 +400,11 @@ export class OsrsClient {
 
   getTickBlend(): number {
     return this.lastTickBlend;
+  }
+
+  /** Dev/test: scrub display interpolation within the current tick (0–1). */
+  setTickBlend(blend: number): void {
+    this.lastTickBlend = Math.min(1, Math.max(0, blend));
   }
 
   seedProgressionFingerprint(progression: ProgressionState): void {

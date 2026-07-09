@@ -56,6 +56,14 @@ export class OsrsOrbitCamera {
     }
   }
 
+  /** Instantly lock the follow point (no glide) — used when scrubbing/teleporting in tests. */
+  snapFocus(tileX: number, tileY: number): void {
+    const pos = tileToWorld3(tileX, tileY, FOCUS_HEIGHT);
+    this.focusTarget.set(pos.x, pos.y, pos.z);
+    this.focusCurrent.copy(this.focusTarget);
+    this.focusInitialized = true;
+  }
+
   update(deltaSeconds: number): void {
     const focusBlend = 1 - Math.exp(-FOCUS_SMOOTH_RATE * deltaSeconds);
     this.focusCurrent.lerp(this.focusTarget, focusBlend);
@@ -182,5 +190,12 @@ export class OsrsOrbitCamera {
 
   snapNorth(): void {
     this.yaw = CAMERA_YAW_NORTH;
+  }
+
+  /** Dev/test: jump the orbit to an absolute yaw/pitch/distance. */
+  setOrbit(yaw: number, pitch: number, distance = this.distance): void {
+    this.yaw = yaw;
+    this.pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch));
+    this.distance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, distance));
   }
 }

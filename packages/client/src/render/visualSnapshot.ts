@@ -36,6 +36,12 @@ interface EntityMotionSegment {
   intendedHeadingEnd: HeadingIndex;
   trickProgressStart: number;
   trickProgressEnd: number;
+  /**
+   * Trick snapshot used for pose/path this segment. Kept through the completing
+   * tick (when the sim has already cleared trickAnimation) so progress can ease
+   * through the final half of the timeline instead of snapping off at 0.5.
+   */
+  displayTrick: TrickAnimationSnapshot | null;
 }
 
 function lerpPosition(from: WorldPos, to: WorldPos, t: number): WorldPos {
@@ -65,6 +71,7 @@ function createEntityMotionSegment(
   trickAnimation: TrickAnimationSnapshot | null,
 ): EntityMotionSegment {
   const position = { ...surfboard.position };
+  const progress = trickAnimationProgress(trickAnimation);
   return {
     segmentStart: position,
     segmentEnd: position,
@@ -72,8 +79,9 @@ function createEntityMotionSegment(
     headingEnd: surfboard.currentHeading,
     intendedHeadingStart: surfboard.intendedHeading,
     intendedHeadingEnd: surfboard.intendedHeading,
-    trickProgressStart: trickAnimationProgress(trickAnimation),
-    trickProgressEnd: trickAnimationProgress(trickAnimation),
+    trickProgressStart: progress,
+    trickProgressEnd: progress,
+    displayTrick: trickAnimation,
   };
 }
 
@@ -91,7 +99,14 @@ function onEntitySimulationTick(
   segment.intendedHeadingStart = beforeSurfboard.intendedHeading;
   segment.intendedHeadingEnd = afterSurfboard.intendedHeading;
   segment.trickProgressStart = trickAnimationProgress(beforeTrick);
-  segment.trickProgressEnd = trickAnimationProgress(afterTrick);
+  if (beforeTrick && !afterTrick) {
+    // Completing tick: sim already cleared the animation; keep posing through 1.0.
+    segment.trickProgressEnd = 1;
+    segment.displayTrick = beforeTrick;
+  } else {
+    segment.trickProgressEnd = trickAnimationProgress(afterTrick);
+    segment.displayTrick = afterTrick ?? beforeTrick;
+  }
 }
 
 function ensureEntitySegmentSynced(
@@ -99,7 +114,7 @@ function ensureEntitySegmentSynced(
   surfboard: SurfboardState,
   trickAnimation: TrickAnimationSnapshot | null,
 ): void {
-  if (trickAnimation) {
+  if (trickAnimation || segment.displayTrick) {
     return;
   }
 
@@ -117,6 +132,7 @@ function ensureEntitySegmentSynced(
     segment.intendedHeadingEnd = surfboard.intendedHeading;
     segment.trickProgressStart = 0;
     segment.trickProgressEnd = 0;
+    segment.displayTrick = null;
   }
 }
 
@@ -128,22 +144,22 @@ interface InterpolatedSurfEntity {
 function interpolateSurfEntity(
   segment: EntityMotionSegment,
   surfboard: SurfboardState,
-  trickAnimation: TrickAnimationSnapshot | null,
+  _snapshotTrick: TrickAnimationSnapshot | null,
   tickBlend: number,
 ): InterpolatedSurfEntity {
   const t = clamp01(tickBlend);
-  const trickProgress = trickAnimation
+  const trick = segment.displayTrick;
+  const trickProgress = trick
     ? segment.trickProgressStart + (segment.trickProgressEnd - segment.trickProgressStart) * t
     : 0;
 
-  const position =
-    trickAnimation !== null
-      ? trickAnimationPositionAtProgress(trickAnimation, trickProgress)
-      : lerpPosition(segment.segmentStart, segment.segmentEnd, t);
+  const position = trick
+    ? trickAnimationPositionAtProgress(trick, trickProgress)
+    : lerpPosition(segment.segmentStart, segment.segmentEnd, t);
 
-  const displayTrick: DisplayTrickAnimation | null = trickAnimation
+  const displayTrick: DisplayTrickAnimation | null = trick
     ? {
-        ...trickAnimation,
+        ...trick,
         progress: trickProgress,
       }
     : null;
