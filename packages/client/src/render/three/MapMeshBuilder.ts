@@ -2,108 +2,43 @@ import {
   coralParkLandElevationKey,
   coralParkLandSurfaceY,
   TIDE_LEADING_WASH_HEIGHT,
-  TIDE_REEF_SINK_Y,
-  tideWaveSurfaceAtAngle,
+  tideReefYOffset,
+  tideWaveSurfaceY,
   type TideState,
   type TileType,
   type WorldMap,
 } from '@osrs-surfing/engine';
-import {
-  BoxGeometry,
-  Color,
-  Group,
-  InstancedMesh,
-  Matrix4,
-  Mesh,
-  MeshStandardMaterial,
-  PlaneGeometry,
-} from 'three';
+import { Color, Group, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three';
 
-import { renderVariantColor, resolveRenderTileVariant } from '../tileAppearance.js';
+import { renderVariantColor } from '../tileAppearance.js';
 import { TILE_PALETTE } from '../tilePalette.js';
 import { paletteHex } from './hexColor.js';
 import { TideEdgeLayer } from './tideVisualMeshes.js';
+import {
+  buildHeightfieldMesh,
+  type HeightfieldMesh,
+  type HeightfieldTile,
+} from './tileHeightfield.js';
 
+/** Reef overlay tile top in world Y at low tide. */
 const OVERLAY_TILE_HEIGHT = 0.06;
-const OVERLAY_TILE_CENTER_Y = OVERLAY_TILE_HEIGHT / 2;
-const TIDE_WATER_COLUMN_MIN_HEIGHT = 0.35;
-
-const MATRIX = new Matrix4();
-
-type TileInstance = { tx: number; ty: number };
-
-interface TideAnimInstance {
-  tx: number;
-  ty: number;
-  mesh: InstancedMesh;
-  index: number;
-  baseCenterY: number;
-  tileHeight: number;
-  /** Polar angle around the tide centre; filled lazily on first tide update. */
-  angle: number;
-  /** Whether the tile sits inside the reef-ring radial band the wave affects. */
-  inRing: boolean;
-  /** Last applied wave height — instances are skipped when unchanged. */
-  lastWave: number;
-}
-
-/** Wave-height change below this is invisible; skip the instance update. */
-const WAVE_EPSILON = 0.01;
-/** Existing cap visibility threshold from the legacy per-frame rebuild. */
-const CAP_MIN_WAVE_TOP = 0.08;
-/** Flood share where coral flips to its submerged colour (resolveRenderTileVariant). */
+/** Skip water quads flatter than this above sea level. */
+const WATER_HEIGHT_EPSILON = 0.04;
+/** Flood share where coral flips to its submerged colour. */
 const CORAL_SUBMERGE_FLOOD = 0.35;
-
-const ZERO_SCALE_MATRIX = new Matrix4().makeScale(0, 0, 0);
-
-const TIDE_ANIM_TILES: ReadonlySet<TileType> = new Set(['coral_rideable', 'shallow']);
+/** Skip reef height updates below this delta. */
+const REEF_SINK_EPSILON = 0.01;
 
 const CORAL_EXPOSED_COLOR = new Color(paletteHex(TILE_PALETTE.reefExposed));
 const CORAL_SUBMERGED_COLOR = new Color(paletteHex(TILE_PALETTE.reefSubmerged));
 
-/**
- * Coral tiles flip between exposed/submerged colors with the tide, so they get
- * their own instanced mesh with per-instance colors; everything else is static.
- */
-function groupInstancesByColor(map: WorldMap, includeLand: boolean): Map<number, TileInstance[]> {
-  const groups = new Map<number, TileInstance[]>();
+type TileCoord = { tx: number; ty: number };
 
+function collectTiles(map: WorldMap, predicate: (tile: TileType) => boolean): TileCoord[] {
+  const tiles: TileCoord[] = [];
   for (let ty = 0; ty < map.heightTiles; ty += 1) {
     for (let tx = 0; tx < map.widthTiles; tx += 1) {
-      const tile = map.tiles[ty][tx];
-      let color: number | null = null;
-
-      if (includeLand && (tile === 'grass' || tile === 'sand')) {
-        color = renderVariantColor(tile);
-      } else if (
-        !includeLand &&
-        tile !== 'deep_water' &&
-        tile !== 'grass' &&
-        tile !== 'sand' &&
-        tile !== 'coral_rideable'
-      ) {
-        const variant = resolveRenderTileVariant(tile, tx + 0.5, ty + 0.5, null);
-        color = renderVariantColor(variant);
-      }
-
-      if (color === null) {
-        continue;
-      }
-
-      const list = groups.get(color) ?? [];
-      list.push({ tx, ty });
-      groups.set(color, list);
-    }
-  }
-
-  return groups;
-}
-
-function collectCoralTiles(map: WorldMap): TileInstance[] {
-  const tiles: TileInstance[] = [];
-  for (let ty = 0; ty < map.heightTiles; ty += 1) {
-    for (let tx = 0; tx < map.widthTiles; tx += 1) {
-      if (map.tiles[ty][tx] === 'coral_rideable') {
+      if (predicate(map.tiles[ty][tx])) {
         tiles.push({ tx, ty });
       }
     }
@@ -111,66 +46,40 @@ function collectCoralTiles(map: WorldMap): TileInstance[] {
   return tiles;
 }
 
-function landTileSurfaceY(tx: number, ty: number, tile: TileType): number {
-  if (tile === 'grass' || tile === 'sand') {
-    return coralParkLandSurfaceY(tx + 0.5, ty + 0.5, tile);
-  }
-  return OVERLAY_TILE_HEIGHT;
-}
-
-function buildInstancedLayer(
-  groups: Map<number, TileInstance[]>,
-  map: WorldMap,
-  tideAnimInstances: TideAnimInstance[],
-  options: { landElevation: boolean; flatHeight: number; flatCenterY: number },
-): InstancedMesh[] {
-  const meshes: InstancedMesh[] = [];
-
-  for (const [color, instances] of groups) {
-    const mesh = new InstancedMesh(
-      new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ color: paletteHex(color) }),
-      instances.length,
-    );
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-
-    for (let i = 0; i < instances.length; i += 1) {
-      const { tx, ty } = instances[i];
-      const tile = map.tiles[ty][tx];
-      const tileHeight = options.landElevation
-        ? landTileSurfaceY(tx, ty, tile)
-        : options.flatHeight;
-      const centerY = options.landElevation ? tileHeight / 2 : options.flatCenterY;
-      MATRIX.makeScale(1, tileHeight, 1);
-      MATRIX.setPosition(tx + 0.5, centerY, ty + 0.5);
-      mesh.setMatrixAt(i, MATRIX);
-
-      if (TIDE_ANIM_TILES.has(tile)) {
-        tideAnimInstances.push({
-          tx,
-          ty,
-          mesh,
-          index: i,
-          baseCenterY: centerY,
-          tileHeight,
-          angle: 0,
-          inRing: true,
-          lastWave: Number.NaN,
-        });
-      }
+/** Shared corner height so grass/sand meshes meet without a vertical seam. */
+function landCornerHeight(map: WorldMap, cx: number, cy: number): number {
+  let hasGrass = false;
+  let hasSand = false;
+  for (const [dx, dy] of [
+    [0, 0],
+    [-1, 0],
+    [0, -1],
+    [-1, -1],
+  ] as const) {
+    const tx = cx + dx;
+    const ty = cy + dy;
+    if (tx < 0 || ty < 0 || tx >= map.widthTiles || ty >= map.heightTiles) {
+      continue;
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    meshes.push(mesh);
+    const tile = map.tiles[ty][tx];
+    if (tile === 'grass') {
+      hasGrass = true;
+    } else if (tile === 'sand') {
+      hasSand = true;
+    }
   }
-
-  return meshes;
+  if (hasGrass) {
+    return coralParkLandSurfaceY(cx, cy, 'grass');
+  }
+  if (hasSand) {
+    return coralParkLandSurfaceY(cx, cy, 'sand');
+  }
+  return 0;
 }
 
-function disposeMeshes(meshes: InstancedMesh[]): void {
-  for (const mesh of meshes) {
-    mesh.geometry.dispose();
-    (mesh.material as MeshStandardMaterial).dispose();
+function disposeHeightfields(fields: HeightfieldMesh[]): void {
+  for (const field of fields) {
+    field.dispose();
   }
 }
 
@@ -178,14 +87,16 @@ export class MapMeshBuilder {
   readonly root = new Group();
   readonly tideEdges = new TideEdgeLayer();
   private water: Mesh | null = null;
-  private landMeshes: InstancedMesh[] = [];
-  private overlayMeshes: InstancedMesh[] = [];
-  private tideAnimInstances: TideAnimInstance[] = [];
-  private waterCaps: InstancedMesh | null = null;
-  private coralMesh: InstancedMesh | null = null;
-  private coralTiles: TileInstance[] = [];
+  private landFields: HeightfieldMesh[] = [];
+  private shallowField: HeightfieldMesh | null = null;
+  private coralField: HeightfieldMesh | null = null;
+  private solidField: HeightfieldMesh | null = null;
+  private tideZoneField: HeightfieldMesh | null = null;
+  private waterField: HeightfieldMesh | null = null;
+  private coralTiles: TileCoord[] = [];
   private coralSubmerged: Uint8Array = new Uint8Array(0);
-  private polarReady = false;
+  private reefTiles: TileCoord[] = [];
+  private lastTidePhase = Number.NaN;
   private mapKey: string | null = null;
 
   constructor() {
@@ -210,191 +121,204 @@ export class MapMeshBuilder {
     this.water.receiveShadow = true;
     this.root.add(this.water);
 
-    const landGroups = groupInstancesByColor(map, true);
-    this.landMeshes = buildInstancedLayer(landGroups, map, [], {
-      landElevation: true,
-      flatHeight: OVERLAY_TILE_HEIGHT,
-      flatCenterY: OVERLAY_TILE_CENTER_Y,
-    });
-    for (const mesh of this.landMeshes) {
-      this.root.add(mesh);
-    }
-
+    this.buildLand(map);
     this.rebuildOverlay(map, tide);
     this.mapKey = nextKey;
   }
 
-  rebuildOverlay(map: WorldMap, tide: TideState | null): void {
-    for (const mesh of this.overlayMeshes) {
-      this.root.remove(mesh);
-    }
-    disposeMeshes(this.overlayMeshes);
-    this.overlayMeshes = [];
-
-    if (this.waterCaps) {
-      this.root.remove(this.waterCaps);
-      this.waterCaps.geometry.dispose();
-      (this.waterCaps.material as MeshStandardMaterial).dispose();
-      this.waterCaps = null;
-    }
-    if (this.coralMesh) {
-      this.root.remove(this.coralMesh);
-      this.coralMesh.geometry.dispose();
-      (this.coralMesh.material as MeshStandardMaterial).dispose();
-      this.coralMesh = null;
-    }
-
-    this.tideAnimInstances = [];
-    const overlayGroups = groupInstancesByColor(map, false);
-    this.overlayMeshes = buildInstancedLayer(overlayGroups, map, this.tideAnimInstances, {
-      landElevation: false,
-      flatHeight: OVERLAY_TILE_HEIGHT,
-      flatCenterY: OVERLAY_TILE_CENTER_Y,
-    });
-    for (const mesh of this.overlayMeshes) {
-      this.root.add(mesh);
-    }
-
-    this.buildCoralMesh(map);
-
-    if (this.tideAnimInstances.length > 0) {
-      this.waterCaps = new InstancedMesh(
-        new BoxGeometry(1, 1, 1),
-        new MeshStandardMaterial({
-          color: paletteHex(TILE_PALETTE.shallow),
-          transparent: true,
-          opacity: 0.62,
-          roughness: 0.35,
-          metalness: 0.1,
-        }),
-        this.tideAnimInstances.length,
+  private buildLand(map: WorldMap): void {
+    for (const landType of ['grass', 'sand'] as const) {
+      const tiles = collectTiles(map, (tile) => tile === landType).map(
+        (tile): HeightfieldTile => tile,
       );
-      // Caps keep one stable slot per tide instance; hidden slots are zero-scaled.
-      for (let i = 0; i < this.tideAnimInstances.length; i += 1) {
-        this.waterCaps.setMatrixAt(i, ZERO_SCALE_MATRIX);
+      if (tiles.length === 0) {
+        continue;
       }
-      this.waterCaps.instanceMatrix.needsUpdate = true;
-      this.root.add(this.waterCaps);
+      const field = buildHeightfieldMesh(tiles, (cx, cy) => landCornerHeight(map, cx, cy), {
+        color: paletteHex(renderVariantColor(landType)),
+        skirts: true,
+        skirtBottom: 0,
+        roughness: 0.92,
+        flatShading: true,
+      });
+      this.landFields.push(field);
+      this.root.add(field.mesh);
+    }
+  }
+
+  rebuildOverlay(map: WorldMap, tide: TideState | null): void {
+    this.clearOverlay();
+
+    const shallowTiles = collectTiles(map, (tile) => tile === 'shallow');
+    if (shallowTiles.length > 0) {
+      this.shallowField = buildHeightfieldMesh(shallowTiles, () => OVERLAY_TILE_HEIGHT, {
+        color: paletteHex(TILE_PALETTE.shallow),
+        skirts: true,
+        skirtBottom: 0,
+        roughness: 0.85,
+        flatShading: true,
+      });
+      this.root.add(this.shallowField.mesh);
     }
 
-    this.polarReady = false;
+    const solidTiles = collectTiles(map, (tile) => tile === 'coral_solid');
+    if (solidTiles.length > 0) {
+      this.solidField = buildHeightfieldMesh(solidTiles, () => OVERLAY_TILE_HEIGHT, {
+        color: paletteHex(TILE_PALETTE.coralSolid),
+        skirts: true,
+        skirtBottom: 0,
+        roughness: 0.9,
+        flatShading: true,
+      });
+      this.root.add(this.solidField.mesh);
+    }
+
+    const tideZoneTiles = collectTiles(map, (tile) => tile === 'tide_zone');
+    if (tideZoneTiles.length > 0) {
+      this.tideZoneField = buildHeightfieldMesh(tideZoneTiles, () => OVERLAY_TILE_HEIGHT, {
+        color: paletteHex(TILE_PALETTE.tideZone),
+        skirts: true,
+        skirtBottom: 0,
+        roughness: 0.85,
+        flatShading: true,
+      });
+      this.root.add(this.tideZoneField.mesh);
+    }
+
+    this.coralTiles = collectTiles(map, (tile) => tile === 'coral_rideable');
+    this.coralSubmerged = new Uint8Array(this.coralTiles.length).fill(255);
+    if (this.coralTiles.length > 0) {
+      this.coralField = buildHeightfieldMesh(
+        this.coralTiles.map((tile) => ({ ...tile, color: CORAL_EXPOSED_COLOR.clone() })),
+        () => OVERLAY_TILE_HEIGHT,
+        {
+          vertexColors: true,
+          skirts: true,
+          skirtBottom: 0,
+          roughness: 0.85,
+          flatShading: true,
+        },
+      );
+      this.root.add(this.coralField.mesh);
+    }
+
+    this.reefTiles = [...shallowTiles, ...this.coralTiles];
+    this.lastTidePhase = Number.NaN;
     this.updateTideVisuals(map, tide);
   }
 
-  private buildCoralMesh(map: WorldMap): void {
-    this.coralTiles = collectCoralTiles(map);
-    this.coralSubmerged = new Uint8Array(this.coralTiles.length).fill(255);
-    if (this.coralTiles.length === 0) {
-      return;
+  private clearWaterField(): void {
+    if (this.waterField) {
+      this.root.remove(this.waterField.mesh);
+      this.waterField.dispose();
+      this.waterField = null;
     }
-
-    const mesh = new InstancedMesh(
-      new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ color: 0xffffff }),
-      this.coralTiles.length,
-    );
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-
-    for (let i = 0; i < this.coralTiles.length; i += 1) {
-      const { tx, ty } = this.coralTiles[i];
-      MATRIX.makeScale(1, OVERLAY_TILE_HEIGHT, 1);
-      MATRIX.setPosition(tx + 0.5, OVERLAY_TILE_CENTER_Y, ty + 0.5);
-      mesh.setMatrixAt(i, MATRIX);
-      mesh.setColorAt(i, CORAL_EXPOSED_COLOR);
-      this.tideAnimInstances.push({
-        tx,
-        ty,
-        mesh,
-        index: i,
-        baseCenterY: OVERLAY_TILE_CENTER_Y,
-        tileHeight: OVERLAY_TILE_HEIGHT,
-        angle: 0,
-        inRing: true,
-        lastWave: Number.NaN,
-      });
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-
-    this.coralMesh = mesh;
-    this.root.add(mesh);
   }
 
-  /** Polar coords are static per tile; cache them once the tide centre is known. */
-  private initPolarCache(tide: TideState): void {
-    for (const ref of this.tideAnimInstances) {
-      const dx = ref.tx + 0.5 - tide.centerX;
-      const dy = ref.ty + 0.5 - tide.centerY;
-      const dist = Math.hypot(dx, dy);
-      ref.angle = Math.atan2(dy, dx);
-      const innerR = tide.innerRadiusAtAngle?.(ref.angle) ?? tide.innerRadius;
-      const outerR = tide.outerRadiusAtAngle?.(ref.angle) ?? tide.outerRadius;
-      ref.inRing = dist >= innerR - 0.5 && dist <= outerR + 0.5;
-      ref.lastWave = Number.NaN;
+  private clearOverlay(): void {
+    if (this.shallowField) {
+      this.root.remove(this.shallowField.mesh);
+      this.shallowField.dispose();
+      this.shallowField = null;
     }
-    this.polarReady = true;
+    if (this.coralField) {
+      this.root.remove(this.coralField.mesh);
+      this.coralField.dispose();
+      this.coralField = null;
+    }
+    if (this.solidField) {
+      this.root.remove(this.solidField.mesh);
+      this.solidField.dispose();
+      this.solidField = null;
+    }
+    if (this.tideZoneField) {
+      this.root.remove(this.tideZoneField.mesh);
+      this.tideZoneField.dispose();
+      this.tideZoneField = null;
+    }
+    this.clearWaterField();
+    this.coralTiles = [];
+    this.coralSubmerged = new Uint8Array(0);
+    this.reefTiles = [];
+    this.lastTidePhase = Number.NaN;
+  }
+
+  /** Tiles with any corner above sea level — edge tiles slope down to y=0. */
+  private collectWetTiles(tide: TideState): TileCoord[] {
+    const wet: TileCoord[] = [];
+    for (const tile of this.reefTiles) {
+      const { tx, ty } = tile;
+      const corners = [
+        tideWaveSurfaceY(tx, ty, tide),
+        tideWaveSurfaceY(tx + 1, ty, tide),
+        tideWaveSurfaceY(tx, ty + 1, tide),
+        tideWaveSurfaceY(tx + 1, ty + 1, tide),
+      ];
+      if (corners.some((y) => y > WATER_HEIGHT_EPSILON)) {
+        wet.push(tile);
+      }
+    }
+    return wet;
+  }
+
+  private syncWaterField(tide: TideState | null): void {
+    this.clearWaterField();
+    if (!tide) {
+      return;
+    }
+    const wetTiles = this.collectWetTiles(tide);
+    if (wetTiles.length === 0) {
+      return;
+    }
+    this.waterField = buildHeightfieldMesh(wetTiles, (cx, cy) => tideWaveSurfaceY(cx, cy, tide), {
+      color: paletteHex(TILE_PALETTE.shallow),
+      transparent: true,
+      opacity: 0.62,
+      roughness: 0.35,
+      metalness: 0.1,
+      flatShading: true,
+      skirts: false,
+    });
+    this.root.add(this.waterField.mesh);
   }
 
   updateTideVisuals(map: WorldMap, tide: TideState | null): void {
     void map;
 
-    if (tide && !this.polarReady) {
-      this.initPolarCache(tide);
+    const phase = tide?.phaseRadians ?? -1;
+    const phaseChanged =
+      Number.isNaN(this.lastTidePhase) || Math.abs(phase - this.lastTidePhase) >= REEF_SINK_EPSILON;
+    if (phaseChanged) {
+      this.lastTidePhase = phase;
+      const reefHeight = (cx: number, cy: number): number =>
+        OVERLAY_TILE_HEIGHT + (tide ? tideReefYOffset(cx, cy, tide) : 0);
+      this.shallowField?.setCornerHeights(reefHeight);
+      this.coralField?.setCornerHeights(reefHeight);
+      this.syncWaterField(tide);
     }
 
-    const touched = new Set<InstancedMesh>();
-    let capsDirty = false;
-    let colorDirty = false;
-
-    for (let i = 0; i < this.tideAnimInstances.length; i += 1) {
-      const ref = this.tideAnimInstances[i];
-      const waveTop = tide && ref.inRing ? tideWaveSurfaceAtAngle(ref.angle, tide) : 0;
-      if (Math.abs(waveTop - ref.lastWave) < WAVE_EPSILON) {
-        continue;
-      }
-      ref.lastWave = waveTop;
-      const floodFactor = TIDE_LEADING_WASH_HEIGHT > 0 ? waveTop / TIDE_LEADING_WASH_HEIGHT : 0;
-
-      const centerY = ref.baseCenterY - floodFactor * TIDE_REEF_SINK_Y;
-      MATRIX.makeScale(1, ref.tileHeight, 1);
-      MATRIX.setPosition(ref.tx + 0.5, centerY, ref.ty + 0.5);
-      ref.mesh.setMatrixAt(ref.index, MATRIX);
-      touched.add(ref.mesh);
-
-      if (this.waterCaps) {
-        if (waveTop < CAP_MIN_WAVE_TOP) {
-          this.waterCaps.setMatrixAt(i, ZERO_SCALE_MATRIX);
-        } else {
-          const reefBottom = ref.baseCenterY - ref.tileHeight / 2 - floodFactor * TIDE_REEF_SINK_Y;
-          const columnHeight = Math.max(TIDE_WATER_COLUMN_MIN_HEIGHT, waveTop - reefBottom);
-          MATRIX.makeScale(1, columnHeight, 1);
-          MATRIX.setPosition(ref.tx + 0.5, reefBottom + columnHeight / 2, ref.ty + 0.5);
-          this.waterCaps.setMatrixAt(i, MATRIX);
-        }
-        capsDirty = true;
-      }
-
-      if (this.coralMesh && ref.mesh === this.coralMesh) {
-        const submerged = floodFactor > CORAL_SUBMERGE_FLOOD ? 1 : 0;
-        if (this.coralSubmerged[ref.index] !== submerged) {
-          this.coralSubmerged[ref.index] = submerged;
-          this.coralMesh.setColorAt(
-            ref.index,
-            submerged ? CORAL_SUBMERGED_COLOR : CORAL_EXPOSED_COLOR,
-          );
+    if (this.coralField && this.coralTiles.length > 0) {
+      let colorDirty = false;
+      for (let i = 0; i < this.coralTiles.length; i += 1) {
+        const { tx, ty } = this.coralTiles[i];
+        const waveY = tide ? tideWaveSurfaceY(tx + 0.5, ty + 0.5, tide) : 0;
+        const flood = TIDE_LEADING_WASH_HEIGHT > 0 ? waveY / TIDE_LEADING_WASH_HEIGHT : 0;
+        const submerged = flood > CORAL_SUBMERGE_FLOOD ? 1 : 0;
+        if (this.coralSubmerged[i] !== submerged) {
+          this.coralSubmerged[i] = submerged;
           colorDirty = true;
         }
       }
-    }
-
-    for (const mesh of touched) {
-      mesh.instanceMatrix.needsUpdate = true;
-    }
-    if (capsDirty && this.waterCaps) {
-      this.waterCaps.instanceMatrix.needsUpdate = true;
-    }
-    if (colorDirty && this.coralMesh?.instanceColor) {
-      this.coralMesh.instanceColor.needsUpdate = true;
+      if (colorDirty) {
+        const submergedByTile = new Map<string, boolean>();
+        for (let i = 0; i < this.coralTiles.length; i += 1) {
+          const { tx, ty } = this.coralTiles[i];
+          submergedByTile.set(`${tx},${ty}`, this.coralSubmerged[i] === 1);
+        }
+        this.coralField.setTileColors((tx, ty) =>
+          submergedByTile.get(`${tx},${ty}`) ? CORAL_SUBMERGED_COLOR : CORAL_EXPOSED_COLOR,
+        );
+      }
     }
 
     this.tideEdges.sync(tide);
@@ -417,32 +341,12 @@ export class MapMeshBuilder {
       this.root.remove(this.water);
       this.water = null;
     }
-    for (const mesh of this.landMeshes) {
-      this.root.remove(mesh);
+    for (const field of this.landFields) {
+      this.root.remove(field.mesh);
     }
-    disposeMeshes(this.landMeshes);
-    this.landMeshes = [];
-    for (const mesh of this.overlayMeshes) {
-      this.root.remove(mesh);
-    }
-    disposeMeshes(this.overlayMeshes);
-    this.overlayMeshes = [];
-    if (this.waterCaps) {
-      this.root.remove(this.waterCaps);
-      this.waterCaps.geometry.dispose();
-      (this.waterCaps.material as MeshStandardMaterial).dispose();
-      this.waterCaps = null;
-    }
-    if (this.coralMesh) {
-      this.root.remove(this.coralMesh);
-      this.coralMesh.geometry.dispose();
-      (this.coralMesh.material as MeshStandardMaterial).dispose();
-      this.coralMesh = null;
-    }
-    this.coralTiles = [];
-    this.coralSubmerged = new Uint8Array(0);
-    this.tideAnimInstances = [];
-    this.polarReady = false;
+    disposeHeightfields(this.landFields);
+    this.landFields = [];
+    this.clearOverlay();
     this.tideEdges.sync(null);
     this.mapKey = null;
   }

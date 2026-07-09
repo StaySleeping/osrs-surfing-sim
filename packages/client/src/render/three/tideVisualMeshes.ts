@@ -14,10 +14,10 @@ const TAU = Math.PI * 2;
 const MATRIX = new Matrix4();
 const EDGE_ARC_STEPS = 28;
 const EDGE_INSET = 0.08;
-const WASH_ARC_STEPS = 52;
-const WASH_ARC_SPREAD = 0.38;
-const WASH_RADIAL_SAMPLES = 8;
-const WASH_BODY_ROWS = 4;
+/** Light crest accent only — bulky wash body removed for the smooth water heightfield. */
+const CREST_ARC_STEPS = 36;
+const CREST_ARC_SPREAD = 0.22;
+const CREST_RADIAL_SAMPLES = 3;
 
 function radiusAtAngle(tide: TideState, angle: number, outer: boolean): number {
   if (outer) {
@@ -41,10 +41,9 @@ export class TideEdgeLayer {
   readonly root = new Group();
   private leading: InstancedMesh | null = null;
   private trailing: InstancedMesh | null = null;
-  private washBody: InstancedMesh | null = null;
   private washCrest: InstancedMesh | null = null;
   private capacity = 0;
-  private washCapacity = 0;
+  private crestCapacity = 0;
 
   constructor() {
     const foamMaterial = new MeshStandardMaterial({
@@ -60,15 +59,6 @@ export class TideEdgeLayer {
       opacity: 0.45,
       roughness: 0.5,
       metalness: 0.05,
-    });
-    const breakerMaterial = new MeshStandardMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.94,
-      roughness: 0.14,
-      metalness: 0.02,
-      emissive: 0xd0eaff,
-      emissiveIntensity: 0.24,
     });
     const crestMaterial = new MeshStandardMaterial({
       color: 0xffffff,
@@ -93,22 +83,21 @@ export class TideEdgeLayer {
       this.capacity,
     );
 
-    this.washCapacity = WASH_ARC_STEPS * WASH_RADIAL_SAMPLES * WASH_BODY_ROWS * 2;
-    this.washBody = new InstancedMesh(new BoxGeometry(1, 1, 1), breakerMaterial, this.washCapacity);
-    this.washCrest = new InstancedMesh(new BoxGeometry(1, 1, 1), crestMaterial, this.washCapacity);
+    this.crestCapacity = CREST_ARC_STEPS * CREST_RADIAL_SAMPLES;
+    this.washCrest = new InstancedMesh(new BoxGeometry(1, 1, 1), crestMaterial, this.crestCapacity);
 
-    for (const mesh of [this.leading, this.trailing, this.washBody, this.washCrest]) {
+    for (const mesh of [this.leading, this.trailing, this.washCrest]) {
       mesh.visible = false;
       // Instances follow the tide around the island; the bounding sphere three.js
       // computes on first render goes stale and culls them once the camera turns.
       mesh.frustumCulled = false;
     }
-    this.root.add(this.leading, this.trailing, this.washBody, this.washCrest);
+    this.root.add(this.leading, this.trailing, this.washCrest);
   }
 
   sync(tide: TideState | null): void {
-    if (!tide || !this.leading || !this.trailing || !this.washBody || !this.washCrest) {
-      for (const mesh of [this.leading, this.trailing, this.washBody, this.washCrest]) {
+    if (!tide || !this.leading || !this.trailing || !this.washCrest) {
+      for (const mesh of [this.leading, this.trailing, this.washCrest]) {
         if (mesh) {
           mesh.visible = false;
         }
@@ -171,64 +160,43 @@ export class TideEdgeLayer {
     this.trailing.instanceMatrix.needsUpdate = true;
     this.trailing.visible = trailingCount > 0;
 
-    this.syncCurlingWash(tide, center);
+    this.syncCrestAccent(tide, center);
   }
 
-  /** Trailing-edge curl — rolls back over the submerged high-tide body. */
-  private syncCurlingWash(tide: TideState, center: { x: number; y: number; z: number }): void {
-    if (!this.washBody || !this.washCrest) {
+  /** Thin trailing-edge foam line on top of the smooth water heightfield. */
+  private syncCrestAccent(tide: TideState, center: { x: number; y: number; z: number }): void {
+    if (!this.washCrest) {
       return;
     }
 
     const curlAngle = normalizeAngle(tide.phaseRadians + tide.sweepRadians);
     const washHeight = TIDE_LEADING_WASH_HEIGHT;
-    let bodyCount = 0;
     let crestCount = 0;
 
-    for (let row = 0; row < WASH_BODY_ROWS; row += 1) {
-      const rowIntoBand = row / WASH_BODY_ROWS;
-      const arcCenter = normalizeAngle(curlAngle - rowIntoBand * 0.06);
-      const rowHeightScale = 1 - rowIntoBand * 0.22;
+    for (let i = 0; i <= CREST_ARC_STEPS; i += 1) {
+      const arcT = curlAngle + CREST_ARC_SPREAD * (i / CREST_ARC_STEPS - 0.5);
+      const arcBlend = 1 - Math.abs(i / CREST_ARC_STEPS - 0.5) * 1.4;
 
-      for (let i = 0; i <= WASH_ARC_STEPS; i += 1) {
-        const arcT = arcCenter + WASH_ARC_SPREAD * (i / WASH_ARC_STEPS - 0.5);
-        const arcBlend = 1 - Math.abs(i / WASH_ARC_STEPS - 0.5) * 1.15;
-
-        for (let r = 0; r < WASH_RADIAL_SAMPLES; r += 1) {
-          if (bodyCount >= this.washCapacity || crestCount >= this.washCapacity) {
-            break;
-          }
-
-          const radialT = (r + 0.5) / WASH_RADIAL_SAMPLES;
-          const radius = reefRadiusAtAngle(tide, arcT, radialT);
-          const x = center.x + Math.cos(arcT) * radius;
-          const z = center.z + Math.sin(arcT) * radius;
-          const columnHeight = washHeight * rowHeightScale * (0.9 + (r % 3) * 0.05) * arcBlend;
-          const width = 1.55 + radialT * 1.05 - rowIntoBand * 0.2;
-          const depth = 0.72 + radialT * 0.38;
-
-          MATRIX.makeScale(width, columnHeight, depth);
-          MATRIX.setPosition(x, columnHeight * 0.5, z);
-          this.washBody.setMatrixAt(bodyCount, MATRIX);
-          bodyCount += 1;
-
-          const crestHeight = columnHeight * 0.32;
-          const crestLift = columnHeight * 0.92;
-          const curlBack = rowIntoBand * 0.35 + radialT * 0.12;
-          const crestX = center.x + Math.cos(arcT - curlBack) * (radius - 0.15);
-          const crestZ = center.z + Math.sin(arcT - curlBack) * (radius - 0.15);
-
-          MATRIX.makeScale(width * 1.6, crestHeight, depth * 1.4);
-          MATRIX.setPosition(crestX, crestLift + crestHeight * 0.42, crestZ);
-          this.washCrest.setMatrixAt(crestCount, MATRIX);
-          crestCount += 1;
+      for (let r = 0; r < CREST_RADIAL_SAMPLES; r += 1) {
+        if (crestCount >= this.crestCapacity) {
+          break;
         }
+
+        const radialT = (r + 0.5) / CREST_RADIAL_SAMPLES;
+        const radius = reefRadiusAtAngle(tide, arcT, radialT);
+        const crestHeight = washHeight * 0.12 * arcBlend;
+        const crestLift = washHeight * 0.92;
+        const x = center.x + Math.cos(arcT) * radius;
+        const z = center.z + Math.sin(arcT) * radius;
+        const width = 1.2 + radialT * 0.6;
+        const depth = 0.45 + radialT * 0.2;
+
+        MATRIX.makeScale(width, crestHeight, depth);
+        MATRIX.setPosition(x, crestLift + crestHeight * 0.4, z);
+        this.washCrest.setMatrixAt(crestCount, MATRIX);
+        crestCount += 1;
       }
     }
-
-    this.washBody.count = bodyCount;
-    this.washBody.instanceMatrix.needsUpdate = true;
-    this.washBody.visible = bodyCount > 0;
 
     this.washCrest.count = crestCount;
     this.washCrest.instanceMatrix.needsUpdate = true;
@@ -236,7 +204,7 @@ export class TideEdgeLayer {
   }
 
   dispose(): void {
-    for (const mesh of [this.leading, this.trailing, this.washBody, this.washCrest]) {
+    for (const mesh of [this.leading, this.trailing, this.washCrest]) {
       if (!mesh) {
         continue;
       }
@@ -246,7 +214,6 @@ export class TideEdgeLayer {
     }
     this.leading = null;
     this.trailing = null;
-    this.washBody = null;
     this.washCrest = null;
     void TAU;
   }
