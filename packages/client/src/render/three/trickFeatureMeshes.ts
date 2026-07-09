@@ -274,14 +274,15 @@ function buildTunnelGroup(
   arch.position.y = baseY;
   group.add(arch);
 
-  const mouthZ = major * TUNNEL_TORUS_LENGTH_SCALE * 0.92;
+  // Coral ribs sit close to the mid-tube, not out at the bore ends.
+  const ribZ = major * TUNNEL_TORUS_LENGTH_SCALE * 0.22;
   for (const zSign of [-1, 1]) {
-    const mouth = new Mesh(
+    const rib = new Mesh(
       new TorusGeometry(major * 0.98, tube * 0.55, 5, 10, Math.PI),
       makeMaterial(palette.base, alpha),
     );
-    mouth.position.set(0, baseY, zSign * mouthZ);
-    group.add(mouth);
+    rib.position.set(0, baseY, zSign * ribZ);
+    group.add(rib);
   }
 
   for (const angle of [0.35, 0.9, Math.PI - 0.35, Math.PI - 0.9]) {
